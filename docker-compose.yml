@@ -1,0 +1,19 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: supertechstack
+    restart: always
+    environment:
+      POSTGRES_USER: supertechstack
+      POSTGRES_PASSWORD: supertechstack
+      POSTGRES_DB: supertechstack
+    ports: 
+      - "5435:5432"
+    volumes:
+      - SuperTechStack_postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+  
+volumes:
+  SuperTechStack_postgres_data:
+
+
