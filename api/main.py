@@ -3,7 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.database import Base, engine
 from app.models import workspace
-from app.routes.workspaces import router as ws_router
+
+from app.models import chunk, source, workspace
+from app.routes.sources import router as sources_router
+from app.routes.workspaces import router as workspaces_router
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,7 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(ws_router)
+app.include_router(workspaces_router)
+app.include_router(sources_router)
+
 
 @app.get("/")
 def read_root():
