@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 type Workspace = {
@@ -19,8 +20,8 @@ export default function HomePage() {
 
   const fetchWorkspaces = useCallback(async () => {
     const response = await fetch(`${apiUrl}/workspaces`);
-    const data = await response.json();
-    setWorkspaces(data);
+    const data: Workspace[] = await response.json();
+    return data;
   }, []);
 
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
@@ -38,11 +39,21 @@ export default function HomePage() {
     });
     setWorkspaceName("");
     setWorkspaceDescription("");
-    await fetchWorkspaces();
+    setWorkspaces(await fetchWorkspaces());
   }
 
   useEffect(() => {
-    void fetchWorkspaces();
+    let cancelled = false;
+
+    void fetchWorkspaces().then((data) => {
+      if (!cancelled) {
+        setWorkspaces(data);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [fetchWorkspaces]);
 
   return (
@@ -89,6 +100,10 @@ export default function HomePage() {
               <p className="text-sm text-gray-600">
                 {workspace.description || "No description"}
               </p>
+              
+              <Link href={`/workspaces/${workspace.id}`}>
+                Open workspace
+              </Link>
             </div>
           ))}
         </div>
