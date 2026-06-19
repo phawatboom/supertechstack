@@ -11,7 +11,7 @@ services:
       - "5435:5432"
     volumes:
       - SuperTechStack_postgres_data:/var/lib/postgresql/data
-      - ./infra/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../infra/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
   
 volumes:
   SuperTechStack_postgres_data:
