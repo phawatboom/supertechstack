@@ -18,7 +18,7 @@ from app.services.source_ingestion import ingest_source_text
 
 router = APIRouter(tags=["uploads"])
 
-MAX_FILE_SIZE = 20 * 1024 * 1024
+MAX_FILE_SIZE = 60 * 1024 * 1024
 
 
 @router.post(
@@ -54,7 +54,7 @@ async def upload_source(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=413,
-            detail="File exceeds the 20 MB limit",
+            detail="File exceeds the 60 MB limit",
         )
 
     if not content:
