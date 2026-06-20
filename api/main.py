@@ -6,6 +6,7 @@ from app.models import chunk, report, source, workspace
 from app.routes.answers import router as answers_router
 from app.routes.search import router as search_router
 from app.routes.sources import router as sources_router
+from app.routes.uploads import router as uploads_router
 from app.routes.workspaces import router as workspaces_router
 
 
@@ -28,6 +29,7 @@ app.include_router(workspaces_router)
 app.include_router(sources_router)
 app.include_router(search_router)
 app.include_router(answers_router)
+app.include_router(uploads_router)
 
 
 @app.get("/")

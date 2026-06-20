@@ -6,12 +6,15 @@ from app.models.chunk import Chunk
 from app.models.source import Source
 from app.models.workspace import Workspace
 from app.schemas.source import ChunkResponse, SourceCreate, SourceResponse
-from app.services.chunking import chunk_text
-from app.services.embeddings import create_embeddings
+from app.services.source_ingestion import ingest_source_text
 
 router = APIRouter(tags=["sources"])
 
-@router.post("/workspaces/{workspace_id}/sources", response_model=SourceResponse)
+
+@router.post(
+    "/workspaces/{workspace_id}/sources",
+    response_model=SourceResponse,
+)
 def create_source(
     workspace_id: int,
     source_input: SourceCreate,
@@ -22,41 +25,24 @@ def create_source(
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    chunks = chunk_text(source_input.raw_text)
-
-    if not chunks:
-        raise HTTPException(status_code=422, detail="Source text cannot be blank")
-
-    chunk_embeddings = create_embeddings(chunks)
-
-    if len(chunk_embeddings) != len(chunks):
-        raise HTTPException(status_code=502, detail="Failed to embed all source chunks")
-
-    source = Source(
-        workspace_id=workspace_id,
-        title=source_input.title,
-        raw_text=source_input.raw_text,
-    )
-
-    database_session.add(source)
-    database_session.flush()
-
-    for index, chunk_content in enumerate(chunks):
-        chunk = Chunk(
-            source_id=source.id,
+    try:
+        return ingest_source_text(
+            database_session=database_session,
             workspace_id=workspace_id,
-            chunk_index=index,
-            content=chunk_content,
-            embedding=chunk_embeddings[index],
+            title=source_input.title,
+            raw_text=source_input.raw_text,
+            source_type="pasted_text",
         )
-        database_session.add(chunk)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
 
-    database_session.commit()
-    database_session.refresh(source)
 
-    return source
-
-@router.get("/workspaces/{workspace_id}/sources", response_model=list[SourceResponse])
+@router.get(
+    "/workspaces/{workspace_id}/sources",
+    response_model=list[SourceResponse],
+)
 def list_sources(
     workspace_id: int,
     database_session: Session = Depends(get_database_session),
@@ -68,7 +54,11 @@ def list_sources(
         .all()
     )
 
-@router.get("/workspaces/{workspace_id}/chunks", response_model=list[ChunkResponse])
+
+@router.get(
+    "/workspaces/{workspace_id}/chunks",
+    response_model=list[ChunkResponse],
+)
 def list_chunks(
     workspace_id: int,
     database_session: Session = Depends(get_database_session),
@@ -79,4 +69,3 @@ def list_chunks(
         .order_by(Chunk.source_id, Chunk.chunk_index)
         .all()
     )
-
