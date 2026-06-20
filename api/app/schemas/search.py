@@ -9,6 +9,7 @@ class SearchRequest(BaseModel):
 class SearchResultResponse(BaseModel):
     chunk_id: int
     source_id: int
+    source_title: str
     chunk_index: int
     content: str
     similarity: float

@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.database import Base, engine
-from app.models import chunk, source, workspace
+from app.models import chunk, report, source, workspace
+from app.routes.answers import router as answers_router
 from app.routes.search import router as search_router
 from app.routes.sources import router as sources_router
 from app.routes.workspaces import router as workspaces_router
@@ -26,6 +27,7 @@ app.add_middleware(
 app.include_router(workspaces_router)
 app.include_router(sources_router)
 app.include_router(search_router)
+app.include_router(answers_router)
 
 
 @app.get("/")
