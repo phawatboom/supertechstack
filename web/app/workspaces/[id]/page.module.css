@@ -348,6 +348,149 @@
   opacity: 0.65;
 }
 
+.advancedSettings {
+  overflow: hidden;
+  border: 1px solid #dfe3ec;
+  border-radius: 13px;
+  background: #f8f9fc;
+}
+
+.advancedSettings > summary {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  color: #334155;
+  list-style: none;
+}
+
+.advancedSettings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advancedSettings > summary > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.advancedSettings > summary strong {
+  font-size: 13px;
+}
+
+.advancedSettings > summary small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.advancedSettings > summary > span:last-child {
+  color: #64748b;
+  font-size: 18px;
+  transition: transform 150ms ease;
+}
+
+.advancedSettings[open] > summary > span:last-child {
+  transform: rotate(180deg);
+}
+
+.advancedSettingsBody {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border-top: 1px solid #dfe3ec;
+  background: #fff;
+}
+
+.settingsHeader {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.settingsHeader p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.settingsHeader code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-family: var(--font-geist-mono), Consolas, monospace;
+}
+
+.form .resetSettingsButton {
+  min-height: auto;
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid #dfe3ec;
+  background: #fff;
+  color: #475569;
+  font-size: 10px;
+  box-shadow: none;
+}
+
+.form .resetSettingsButton:hover:not(:disabled) {
+  transform: none;
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.checkboxLabel {
+  display: flex !important;
+  align-items: center;
+  align-self: end;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid #d9deea;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.form .checkboxLabel input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  accent-color: #4f46e5;
+}
+
+.checkboxLabel > span {
+  display: grid;
+  gap: 2px;
+}
+
+.checkboxLabel strong {
+  color: #334155;
+  font-size: 11px;
+}
+
+.checkboxLabel small {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.templateInput {
+  font-family: var(--font-geist-mono), Consolas, monospace !important;
+  font-size: 12px !important;
+}
+
 .formFooter {
   color: #94a3b8;
   font-size: 12px;
@@ -583,6 +726,223 @@
   font-weight: 750;
 }
 
+.secondaryButton {
+  padding: 7px 11px;
+  border: 1px solid #dfe3ec;
+  border-radius: 9px;
+  cursor: pointer;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.secondaryButton:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.traceEmpty,
+.traceLoading {
+  padding: 22px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.traceList {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+}
+
+.traceRow {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) 74px 90px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid #edf0f5;
+  cursor: pointer;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  text-align: left;
+}
+
+.traceRow:first-child {
+  border-top: 0;
+}
+
+.traceRow:hover,
+.traceRowActive {
+  background: #f7f7ff;
+}
+
+.traceStatus {
+  width: fit-content;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.traceSuccess {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.traceFailure {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.tracePending {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.traceQuery {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traceTiming,
+.traceRow time {
+  color: #94a3b8;
+  font-size: 10px;
+  text-align: right;
+}
+
+.traceLoading {
+  margin-top: 14px;
+}
+
+.traceDetail {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #dfe3ec;
+  border-radius: 14px;
+  background: #f8f9fc;
+}
+
+.traceDetailHeader {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.traceDetailHeader div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.traceDetailHeader span,
+.traceMetrics span {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.traceDetailHeader code {
+  overflow: hidden;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traceMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.traceMetrics div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-left: 1px solid #e2e8f0;
+}
+
+.traceMetrics div:first-child {
+  border-left: 0;
+}
+
+.traceMetrics strong {
+  color: #334155;
+  font-size: 14px;
+}
+
+.traceErrorBlock {
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 12px;
+}
+
+.traceErrorBlock p {
+  margin: 5px 0 0;
+  line-height: 1.6;
+}
+
+.traceDataBlock {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.traceDataBlock summary {
+  padding: 11px 13px;
+  cursor: pointer;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.traceDataBlock[open] summary {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.traceDataBlock pre {
+  max-height: 420px;
+  margin: 0;
+  overflow: auto;
+  padding: 14px;
+  color: #334155;
+  font-family: var(--font-geist-mono), Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .modalBackdrop {
   position: fixed;
   z-index: 100;
@@ -736,8 +1096,45 @@
     display: grid;
   }
 
+  .settingsHeader {
+    display: grid;
+  }
+
+  .settingsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .form .resetSettingsButton {
+    width: fit-content;
+  }
+
   .form button {
     width: 100%;
+  }
+
+  .traceRow {
+    grid-template-columns: 78px minmax(0, 1fr) 62px;
+  }
+
+  .traceRow time {
+    display: none;
+  }
+
+  .traceDetailHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .traceMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .traceMetrics div:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .traceMetrics div:nth-child(4) {
+    border-top: 1px solid #e2e8f0;
   }
 
   .modalBackdrop {
