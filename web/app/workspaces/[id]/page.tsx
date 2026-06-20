@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import styles from "./page.module.css";
 
 type Workspace = {
@@ -17,6 +23,10 @@ type Source = {
   title: string;
   source_type: string;
   raw_text: string;
+  original_filename: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  extraction_status: string;
   created_at: string;
 };
 
@@ -45,7 +55,24 @@ type AnswerResult = {
   citations: Citation[];
 };
 
+type DetailView =
+  | { kind: "source"; item: Source }
+  | { kind: "chunk"; item: Chunk };
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const maxUploadSize = 20 * 1024 * 1024;
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -78,10 +105,17 @@ export default function WorkspaceDetailPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceError, setSourceError] = useState("");
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [answerQuery, setAnswerQuery] = useState("");
   const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null);
   const [isAnswering, setIsAnswering] = useState(false);
   const [answerError, setAnswerError] = useState("");
+  const [detailView, setDetailView] = useState<DetailView | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const closeDetailButtonRef = useRef<HTMLButtonElement>(null);
 
   const fetchWorkspaceData = useCallback(async () => {
     const [workspaceResponse, sourcesResponse, chunksResponse] =
@@ -129,6 +163,36 @@ export default function WorkspaceDetailPage() {
     };
   }, [fetchWorkspaceData]);
 
+  useEffect(() => {
+    if (!detailView) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeDetailButtonRef.current?.focus();
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDetailView(null);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [detailView]);
+
+  function sourceTitleForChunk(chunk: Chunk) {
+    return (
+      sources.find((source) => source.id === chunk.source_id)?.title ??
+      `Source ${chunk.source_id}`
+    );
+  }
+
   async function createSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -166,6 +230,58 @@ export default function WorkspaceDetailPage() {
       );
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function uploadSource(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedFile) {
+      setUploadError("Select a file before uploading.");
+      return;
+    }
+
+    if (selectedFile.size > maxUploadSize) {
+      setUploadError("The selected file exceeds the 20 MB limit.");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      if (uploadTitle.trim()) {
+        formData.append("title", uploadTitle.trim());
+      }
+
+      const response = await fetch(
+        `${apiUrl}/workspaces/${workspaceId}/uploads`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      await readResponse<Source>(response);
+      const data = await fetchWorkspaceData();
+
+      setUploadTitle("");
+      setSelectedFile(null);
+      setSources(data.sourcesData);
+      setChunks(data.chunksData);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "Unable to upload the file.",
+      );
+    } finally {
+      setIsUploading(false);
     }
   }
 
@@ -249,7 +365,98 @@ export default function WorkspaceDetailPage() {
             <div className={styles.sectionHeading}>
               <div>
                 <p className={styles.step}>Step 1</p>
-                <h2>Add a source</h2>
+                <h2>Upload a document</h2>
+              </div>
+              <span className={styles.badge}>PDF · DOCX · Text</span>
+            </div>
+
+            <p className={styles.sectionCopy}>
+              Upload a PDF, DOCX, TXT, Markdown, or LaTeX file up to 20 MB.
+              Scanned PDFs require OCR and may not contain extractable text.
+            </p>
+
+            <form
+              onSubmit={uploadSource}
+              encType="multipart/form-data"
+              className={styles.form}
+            >
+              <label>
+                Source title <span className={styles.optional}>Optional</span>
+                <input
+                  value={uploadTitle}
+                  onChange={(event) => setUploadTitle(event.target.value)}
+                  placeholder="Defaults to the filename"
+                  disabled={isUploading}
+                  maxLength={255}
+                />
+              </label>
+
+              <label className={styles.filePicker}>
+                <span className={styles.filePickerIcon} aria-hidden="true">
+                  ↑
+                </span>
+                <strong>
+                  {selectedFile ? "Choose a different file" : "Choose a document"}
+                </strong>
+                <small>PDF, DOCX, TXT, MD, or TEX · maximum 20 MB</small>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt,.md,.tex"
+                  disabled={isUploading}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setSelectedFile(file);
+                    setUploadError("");
+                  }}
+                />
+              </label>
+
+              {selectedFile && (
+                <div className={styles.selectedFile}>
+                  <div>
+                    <strong>{selectedFile.name}</strong>
+                    <span>{formatFileSize(selectedFile.size)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.removeFile}
+                    disabled={isUploading}
+                    onClick={() => {
+                      setSelectedFile(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              {uploadError && (
+                <p className={styles.error} role="alert">
+                  {uploadError}
+                </p>
+              )}
+
+              <div className={styles.formFooter}>
+                <span>Text is extracted, chunked, and indexed automatically</span>
+                <button
+                  type="submit"
+                  disabled={isUploading || !selectedFile}
+                >
+                  {isUploading ? "Uploading document…" : "Upload document"}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section className={styles.card}>
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className={styles.step}>Step 2</p>
+                <h2>Paste source text</h2>
               </div>
               <span className={styles.badge}>Text</span>
             </div>
@@ -299,7 +506,7 @@ export default function WorkspaceDetailPage() {
           <section className={styles.card}>
             <div className={styles.sectionHeading}>
               <div>
-                <p className={styles.step}>Step 2</p>
+                <p className={styles.step}>Step 3</p>
                 <h2>Ask this workspace</h2>
               </div>
               <span className={styles.badge}>Grounded AI</span>
@@ -400,10 +607,28 @@ export default function WorkspaceDetailPage() {
                       </time>
                     </div>
                     <h3>{source.title}</h3>
+                    {source.original_filename && (
+                      <div className={styles.sourceDetails}>
+                        <span>{source.original_filename}</span>
+                        {source.file_size !== null && (
+                          <span>{formatFileSize(source.file_size)}</span>
+                        )}
+                      </div>
+                    )}
                     <p>
                       {source.raw_text.slice(0, 150)}
                       {source.raw_text.length > 150 ? "…" : ""}
                     </p>
+                    <button
+                      type="button"
+                      className={styles.viewButton}
+                      onClick={() =>
+                        setDetailView({ kind: "source", item: source })
+                      }
+                    >
+                      View full source
+                      <span aria-hidden="true">→</span>
+                    </button>
                   </article>
                 ))}
               </div>
@@ -430,6 +655,16 @@ export default function WorkspaceDetailPage() {
                       Source {chunk.source_id} · Chunk {chunk.chunk_index + 1}
                     </span>
                     <p>{chunk.content}</p>
+                    <button
+                      type="button"
+                      className={styles.viewButton}
+                      onClick={() =>
+                        setDetailView({ kind: "chunk", item: chunk })
+                      }
+                    >
+                      View full chunk
+                      <span aria-hidden="true">→</span>
+                    </button>
                   </article>
                 ))}
               </div>
@@ -437,6 +672,86 @@ export default function WorkspaceDetailPage() {
           </section>
         </aside>
       </div>
+
+      {detailView && (
+        <div
+          className={styles.modalBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setDetailView(null);
+            }
+          }}
+        >
+          <section
+            className={styles.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detail-title"
+          >
+            <header className={styles.modalHeader}>
+              <div>
+                <p className={styles.step}>
+                  {detailView.kind === "source"
+                    ? "Complete source"
+                    : "Complete chunk"}
+                </p>
+                <h2 id="detail-title">
+                  {detailView.kind === "source"
+                    ? detailView.item.title
+                    : `${sourceTitleForChunk(detailView.item)} · Chunk ${
+                        detailView.item.chunk_index + 1
+                      }`}
+                </h2>
+              </div>
+              <button
+                ref={closeDetailButtonRef}
+                type="button"
+                className={styles.closeButton}
+                aria-label="Close full content view"
+                onClick={() => setDetailView(null)}
+              >
+                ×
+              </button>
+            </header>
+
+            {detailView.kind === "source" ? (
+              <>
+                <div className={styles.modalMetadata}>
+                  <span>{detailView.item.source_type}</span>
+                  <span>{formatDate(detailView.item.created_at)}</span>
+                  <span>
+                    {detailView.item.raw_text.length.toLocaleString()} characters
+                  </span>
+                  {detailView.item.file_size !== null && (
+                    <span>{formatFileSize(detailView.item.file_size)}</span>
+                  )}
+                  {detailView.item.original_filename && (
+                    <span>{detailView.item.original_filename}</span>
+                  )}
+                </div>
+                <div className={styles.fullContent}>
+                  {detailView.item.raw_text}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.modalMetadata}>
+                  <span>Chunk #{detailView.item.chunk_index + 1}</span>
+                  <span>Source #{detailView.item.source_id}</span>
+                  <span>
+                    {detailView.item.content.length.toLocaleString()} characters
+                  </span>
+                  <span>{formatDate(detailView.item.created_at)}</span>
+                </div>
+                <div className={styles.fullContent}>
+                  {detailView.item.content}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </main>
   );
 }
