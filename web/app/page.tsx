@@ -128,7 +128,7 @@ export default function HomePage() {
           <span className={styles.logoMark} aria-hidden="true">
             I
           </span>
-          <span>InsightOS</span>
+          <span>Supertechstack</span>
         </Link>
 
         <span className={styles.status}>
