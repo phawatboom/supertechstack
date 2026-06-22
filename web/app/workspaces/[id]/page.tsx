@@ -50,6 +50,15 @@ type Citation = {
   similarity: number;
 };
 
+type SearchResult = {
+  chunk_id: number;
+  source_id: number;
+  source_title: string;
+  chunk_index: number;
+  content: string;
+  similarity: number;
+};
+
 type AnswerResult = {
   trace_id: string | null;
   report_id: number | null;
@@ -177,6 +186,11 @@ export default function WorkspaceDetailPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [answerQuery, setAnswerQuery] = useState("");
   const [answerDefaults, setAnswerDefaults] = useState(fallbackAnswerDefaults);
   const [answerModel, setAnswerModel] = useState(fallbackAnswerDefaults.model);
@@ -496,6 +510,44 @@ export default function WorkspaceDetailPage() {
     }
   }
 
+  async function searchWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const query = searchQuery.trim();
+
+    if (!query) {
+      setSearchError("Enter a search query first.");
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError("");
+    setHasSearched(true);
+
+    try {
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/search`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query,
+            limit: Math.min(10, answerDefaults.max_retrieval_limit),
+          }),
+        },
+      );
+
+      setSearchResults(await readResponse<SearchResult[]>(response));
+    } catch (error) {
+      setSearchResults([]);
+      setSearchError(
+        error instanceof Error ? error.message : "Failed to search sources.",
+      );
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
   if (isPageLoading) {
     return (
       <main className={styles.shell}>
@@ -687,6 +739,112 @@ export default function WorkspaceDetailPage() {
             <div className={styles.sectionHeading}>
               <div>
                 <p className={styles.step}>Step 3</p>
+                <h2>Search saved sources</h2>
+              </div>
+              <span className={styles.badge}>Semantic search</span>
+            </div>
+
+            <p className={styles.sectionCopy}>
+              Find relevant passages by meaning. This creates one query
+              embedding, searches pgvector, and does not generate an AI answer.
+            </p>
+
+            <form onSubmit={searchWorkspace} className={styles.form}>
+              <label>
+                Search query
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="e.g. database connection pooling"
+                  disabled={isSearching || chunks.length === 0}
+                  maxLength={20000}
+                />
+              </label>
+
+              {chunks.length === 0 && (
+                <p className={styles.hint}>
+                  Save at least one source before searching.
+                </p>
+              )}
+
+              {searchError && (
+                <p className={styles.error} role="alert">
+                  {searchError}
+                </p>
+              )}
+
+              <div className={styles.formFooter}>
+                <span>Returns up to 10 matching passages</span>
+                <button
+                  type="submit"
+                  disabled={isSearching || chunks.length === 0}
+                >
+                  {isSearching ? "Searching…" : "Search sources"}
+                </button>
+              </div>
+            </form>
+
+            {hasSearched && !isSearching && !searchError && (
+              <div className={styles.searchResults} aria-live="polite">
+                <div className={styles.searchResultsHeader}>
+                  <h3>Search results</h3>
+                  <span>
+                    {searchResults.length}{" "}
+                    {searchResults.length === 1 ? "match" : "matches"}
+                  </span>
+                </div>
+
+                {searchResults.length === 0 ? (
+                  <div className={styles.searchEmpty}>
+                    No matching passages were found.
+                  </div>
+                ) : (
+                  <div className={styles.searchResultList}>
+                    {searchResults.map((result) => {
+                      const chunk = chunks.find(
+                        (item) => item.id === result.chunk_id,
+                      );
+
+                      return (
+                        <article
+                          key={result.chunk_id}
+                          className={styles.searchResult}
+                        >
+                          <div className={styles.searchResultMeta}>
+                            <div>
+                              <strong>{result.source_title}</strong>
+                              <span>Chunk {result.chunk_index + 1}</span>
+                            </div>
+                            <span className={styles.similarity}>
+                              {(result.similarity * 100).toFixed(1)}% match
+                            </span>
+                          </div>
+                          <p>{result.content}</p>
+                          {chunk && (
+                            <button
+                              type="button"
+                              className={styles.viewButton}
+                              onClick={() =>
+                                setDetailView({ kind: "chunk", item: chunk })
+                              }
+                            >
+                              View full passage
+                              <span aria-hidden="true">→</span>
+                            </button>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className={styles.card}>
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className={styles.step}>Step 4</p>
                 <h2>Ask this workspace</h2>
               </div>
               <span className={styles.badge}>Grounded AI</span>

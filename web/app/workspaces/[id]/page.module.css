@@ -726,6 +726,91 @@
   font-weight: 750;
 }
 
+.searchResults {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid #e4e7ee;
+}
+
+.searchResultsHeader,
+.searchResultMeta {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.searchResultsHeader {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.searchResultsHeader h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 15px;
+}
+
+.searchResultsHeader > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.searchResultList {
+  display: grid;
+  gap: 10px;
+}
+
+.searchResult {
+  padding: 16px;
+  border: 1px solid #e4e7ee;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.searchResultMeta > div {
+  display: grid;
+  gap: 3px;
+}
+
+.searchResultMeta strong {
+  color: #334155;
+  font-size: 13px;
+}
+
+.searchResultMeta span {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.searchResultMeta .similarity {
+  flex: 0 0 auto;
+  color: #059669;
+  font-size: 11px;
+}
+
+.searchResult p {
+  display: -webkit-box;
+  margin: 10px 0 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.searchEmpty {
+  padding: 22px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
 .secondaryButton {
   padding: 7px 11px;
   border: 1px solid #dfe3ec;
@@ -1088,7 +1173,8 @@
 
   .sectionHeading,
   .formFooter,
-  .citationHeader {
+  .citationHeader,
+  .searchResultMeta {
     align-items: flex-start;
   }
 
