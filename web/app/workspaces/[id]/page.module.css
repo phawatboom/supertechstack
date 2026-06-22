@@ -1,6 +1,10 @@
 .shell {
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
+  box-sizing: border-box;
   padding: 32px clamp(20px, 4vw, 64px) 64px;
+  overflow-x: clip;
   color: #172033;
   background:
     radial-gradient(circle at top left, rgba(79, 70, 229, 0.1), transparent 30rem),
@@ -12,6 +16,7 @@
 .grid,
 .loadingCard {
   width: min(1180px, 100%);
+  min-width: 0;
   margin-inline: auto;
 }
 
@@ -59,6 +64,10 @@
   margin-bottom: 28px;
 }
 
+.hero > div:first-child {
+  min-width: 0;
+}
+
 .eyebrow,
 .step {
   margin: 0 0 8px;
@@ -72,6 +81,7 @@
 .hero h1 {
   max-width: 760px;
   margin: 0;
+  overflow-wrap: anywhere;
   color: #111827;
   font-size: clamp(32px, 5vw, 52px);
   line-height: 1.05;
@@ -126,6 +136,7 @@
 .primaryColumn,
 .sidebar {
   display: grid;
+  min-width: 0;
   gap: 24px;
 }
 
@@ -143,6 +154,7 @@
 }
 
 .card {
+  min-width: 0;
   padding: clamp(20px, 3vw, 30px);
 }
 
@@ -158,9 +170,18 @@
 .itemMeta,
 .formFooter {
   display: flex;
+  min-width: 0;
   gap: 16px;
   align-items: center;
   justify-content: space-between;
+}
+
+.sectionHeading > :first-child,
+.answerHeader > :first-child,
+.citationHeader > :first-child,
+.itemMeta > :first-child,
+.formFooter > :first-child {
+  min-width: 0;
 }
 
 .sectionHeading h2,
