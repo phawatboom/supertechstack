@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { apiFetch } from "./lib/api";
 import styles from "./page.module.css";
 
 type Workspace = {
@@ -12,7 +13,6 @@ type Workspace = {
   updated_at: string;
 };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const workspaceMarks = [
   styles.mark1,
   styles.mark2,
@@ -48,7 +48,7 @@ export default function HomePage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const fetchWorkspaces = useCallback(async () => {
-    const response = await fetch(`${apiUrl}/workspaces`);
+    const response = await apiFetch("/workspaces");
     return readResponse<Workspace[]>(response);
   }, []);
 
@@ -96,7 +96,7 @@ export default function HomePage() {
     setErrorMessage("");
 
     try {
-      const response = await fetch(`${apiUrl}/workspaces`, {
+      const response = await apiFetch("/workspaces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

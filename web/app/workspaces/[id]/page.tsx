@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import styles from "./page.module.css";
+import { apiFetch } from "../../lib/api";
 
 type Workspace = {
   id: number;
@@ -96,8 +97,9 @@ type DetailView =
   | { kind: "source"; item: Source }
   | { kind: "chunk"; item: Chunk };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const maxUploadSize = 60 * 1024 * 1024;
+const maxUploadSize = Number(
+  process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE_BYTES ?? 60 * 1024 * 1024,
+);
 const fallbackAnswerDefaults: AnswerDefaults = {
   model: "gpt-5.4-mini",
   instructions:
@@ -105,7 +107,7 @@ const fallbackAnswerDefaults: AnswerDefaults = {
   input_template: "Question:\n{query}\n\nRetrieved context:\n{context}",
   retrieval_limit: 5,
   max_retrieval_limit: 20,
-  max_output_tokens: null,
+  max_output_tokens: 2000,
   save_report: true,
 };
 
@@ -211,11 +213,11 @@ export default function WorkspaceDetailPage() {
       tracesResponse,
       defaultsResponse,
     ] = await Promise.all([
-        fetch(`${apiUrl}/workspaces/${workspaceId}`),
-        fetch(`${apiUrl}/workspaces/${workspaceId}/sources`),
-        fetch(`${apiUrl}/workspaces/${workspaceId}/chunks`),
-        fetch(`${apiUrl}/workspaces/${workspaceId}/answer-traces`),
-        fetch(`${apiUrl}/answer-settings/defaults`),
+        apiFetch(`/workspaces/${workspaceId}`),
+        apiFetch(`/workspaces/${workspaceId}/sources`),
+        apiFetch(`/workspaces/${workspaceId}/chunks`),
+        apiFetch(`/workspaces/${workspaceId}/answer-traces`),
+        apiFetch("/answer-settings/defaults"),
       ]);
 
     const [workspaceData, sourcesData, chunksData, tracesData, defaultsData] =
@@ -323,8 +325,8 @@ export default function WorkspaceDetailPage() {
     setTraceError("");
 
     try {
-      const response = await fetch(
-        `${apiUrl}/workspaces/${workspaceId}/answer-traces`,
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/answer-traces`,
       );
       setAnswerTraces(await readResponse<AnswerTraceSummary[]>(response));
     } catch (error) {
@@ -339,7 +341,7 @@ export default function WorkspaceDetailPage() {
     setTraceError("");
 
     try {
-      const response = await fetch(`${apiUrl}/answer-traces/${traceId}`);
+      const response = await apiFetch(`/answer-traces/${traceId}`);
       setSelectedTrace(await readResponse<AnswerTraceDetail>(response));
     } catch (error) {
       setTraceError(
@@ -365,8 +367,8 @@ export default function WorkspaceDetailPage() {
     setSourceError("");
 
     try {
-      const response = await fetch(
-        `${apiUrl}/workspaces/${workspaceId}/sources`,
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/sources`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -399,7 +401,9 @@ export default function WorkspaceDetailPage() {
     }
 
     if (selectedFile.size > maxUploadSize) {
-      setUploadError("The selected file exceeds the 60 MB limit.");
+      setUploadError(
+        `The selected file exceeds the ${formatFileSize(maxUploadSize)} limit.`,
+      );
       return;
     }
 
@@ -414,8 +418,8 @@ export default function WorkspaceDetailPage() {
         formData.append("title", uploadTitle.trim());
       }
 
-      const response = await fetch(
-        `${apiUrl}/workspaces/${workspaceId}/uploads`,
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/uploads`,
         {
           method: "POST",
           body: formData,
@@ -456,8 +460,8 @@ export default function WorkspaceDetailPage() {
     setAnswerResult(null);
 
     try {
-      const response = await fetch(
-        `${apiUrl}/workspaces/${workspaceId}/answer`,
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/answer`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -543,7 +547,8 @@ export default function WorkspaceDetailPage() {
             </div>
 
             <p className={styles.sectionCopy}>
-              Upload a PDF, DOCX, TXT, Markdown, or LaTeX file up to 60 MB.
+              Upload a PDF, DOCX, TXT, Markdown, or LaTeX file up to{" "}
+              {formatFileSize(maxUploadSize)}.
               Scanned PDFs require OCR and may not contain extractable text.
             </p>
 
@@ -570,7 +575,10 @@ export default function WorkspaceDetailPage() {
                 <strong>
                   {selectedFile ? "Choose a different file" : "Choose a document"}
                 </strong>
-                <small>PDF, DOCX, TXT, MD, or TEX · maximum 60 MB</small>
+                <small>
+                  PDF, DOCX, TXT, MD, or TEX · maximum{" "}
+                  {formatFileSize(maxUploadSize)}
+                </small>
                 <input
                   ref={fileInputRef}
                   type="file"
