@@ -6,10 +6,17 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 API_DIR = Path(__file__).resolve().parents[1]
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+REPOSITORY_ROOT = (
+    API_DIR.parent.parent
+    if API_DIR.parent.name == "apps"
+    else None
+)
 
-load_dotenv(REPOSITORY_ROOT / ".env")
+if REPOSITORY_ROOT is not None:
+    load_dotenv(REPOSITORY_ROOT / ".env")
+
 load_dotenv(API_DIR / ".env", override=True)
+
 
 def _csv(name: str, default: str) -> tuple[str, ...]:
     return tuple(
@@ -40,6 +47,7 @@ def _boolean(name: str, default: bool) -> bool:
 
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
+
 @dataclass(frozen=True)
 class Settings:
     environment: str
@@ -62,20 +70,6 @@ class Settings:
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
-
-
-# @lru_cache() 
-# def get_settings() -> Settings:
-#     environment = os.getenv("ENVIRONMENT", "development").strip().lower()
-#     database_url = os.getenv("DATABASE_URL", "").strip()
-
-#     if not database_url:
-#         raise RuntimeError("Database is not set")
-    
-#     auth_mode = os.getenv(
-#         "AUT_MODE",
-#         "beta" if environment == "production" else "disabled",
-#     ).strip().lower()
 
 
 @lru_cache
