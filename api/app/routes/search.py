@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_database_session
 from app.models.workspace import Workspace
+from app.rate_limit import enforce_rate_limit
 from app.schemas.search import SearchRequest, SearchResultResponse
+from app.security import Principal, get_owned_workspace
 from app.services.retrieval import retrieve_chunks
 
 router = APIRouter(tags=["search"])
@@ -16,12 +18,10 @@ router = APIRouter(tags=["search"])
 def search_workspace(
     workspace_id: int,
     search_input: SearchRequest,
+    principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
 ):
-    workspace = database_session.get(Workspace, workspace_id)
-
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    get_owned_workspace(workspace_id, principal, database_session)
 
     retrieved_chunks = retrieve_chunks(
         database_session=database_session,

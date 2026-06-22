@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db.database import get_database_session
-from app.models.workspace import Workspace
+from app.config import Settings, get_settings
+from app.rate_limit import enforce_rate_limit
 from app.schemas.source import SourceResponse
+from app.security import Principal, get_owned_workspace
 from app.services.file_extraction import (
     EmptyDocumentError,
     InvalidDocumentError,
@@ -18,9 +20,6 @@ from app.services.source_ingestion import ingest_source_text
 
 router = APIRouter(tags=["uploads"])
 
-MAX_FILE_SIZE = 60 * 1024 * 1024
-
-
 @router.post(
     "/workspaces/{workspace_id}/uploads",
     response_model=SourceResponse,
@@ -29,12 +28,11 @@ async def upload_source(
     workspace_id: int,
     file: Annotated[UploadFile, File()],
     title: Annotated[str | None, Form(max_length=255)] = None,
+    principal: Principal = Depends(enforce_rate_limit),
+    settings: Settings = Depends(get_settings),
     database_session: Session = Depends(get_database_session),
 ):
-    workspace = database_session.get(Workspace, workspace_id)
-
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    get_owned_workspace(workspace_id, principal, database_session)
 
     original_filename = Path(file.filename or "").name
 
@@ -47,14 +45,17 @@ async def upload_source(
     content_type = file.content_type
 
     try:
-        content = await file.read(MAX_FILE_SIZE + 1)
+        content = await file.read(settings.max_upload_size_bytes + 1)
     finally:
         await file.close()
 
-    if len(content) > MAX_FILE_SIZE:
+    if len(content) > settings.max_upload_size_bytes:
         raise HTTPException(
             status_code=413,
-            detail="File exceeds the 60 MB limit",
+            detail=(
+                "File exceeds the configured upload limit of "
+                f"{settings.max_upload_size_bytes} bytes"
+            ),
         )
 
     if not content:

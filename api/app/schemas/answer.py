@@ -7,10 +7,13 @@ from app.services.generation import (
     DEFAULT_ANSWER_INSTRUCTIONS,
     DEFAULT_INPUT_TEMPLATE,
 )
+from app.config import get_settings
+
+settings = get_settings()
 
 class AnswerRequest(BaseModel):
     query: str = Field(min_length=1, max_length=20_000)
-    limit: int = Field(default=5, ge=1, le=20)
+    limit: int = Field(default=5, ge=1, le=settings.max_retrieval_limit)
     save_report: bool = True
     model: str = Field(default=ANSWER_MODEL, min_length=1, max_length=100)
     instructions: str = Field(
@@ -23,7 +26,11 @@ class AnswerRequest(BaseModel):
         min_length=1,
         max_length=50_000,
     )
-    max_output_tokens: int | None = Field(default=None, ge=1, le=100_000)
+    max_output_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=settings.max_output_tokens,
+    )
 
     @field_validator("query", "model", "instructions", "input_template")
     @classmethod

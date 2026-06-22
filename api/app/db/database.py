@@ -1,21 +1,13 @@
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-API_DIR = Path(__file__).resolve().parents[2]
-REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
+from app.config import get_settings
 
-load_dotenv(REPOSITORY_ROOT / ".env")
-load_dotenv(API_DIR / ".env", override=True)
-
-database_url = os.getenv("DATABASE_URL")
-
-if database_url is None:
-    raise RuntimeError("DATABASE_URL is not set")
-engine = create_engine(database_url)
+settings = get_settings()
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,

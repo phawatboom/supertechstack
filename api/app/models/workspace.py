@@ -8,6 +8,11 @@ from app.db.database import Base
 class Workspace(Base):
     __tablename__ = "workspaces"
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    owner_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

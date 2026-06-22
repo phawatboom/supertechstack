@@ -1,16 +1,11 @@
-import os
 from dataclasses import dataclass
-from pathlib import Path
-
-from dotenv import load_dotenv
 from openai import OpenAI
 
+from app.config import get_settings
 from app.services.retrieval import RetrievedChunk
 
-API_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(API_DIR / ".env")
-
-ANSWER_MODEL = os.getenv("OPENAI_ANSWER_MODEL", "gpt-5.4-mini")
+settings = get_settings()
+ANSWER_MODEL = settings.default_answer_model
 DEFAULT_ANSWER_INSTRUCTIONS = (
     "You are a source-grounded research assistant. "
     "Answer only using the supplied context. "
@@ -78,7 +73,11 @@ def build_generation_request(
         instructions=(instructions or DEFAULT_ANSWER_INSTRUCTIONS).strip(),
         input_text=rendered_input,
         input_template=resolved_template,
-        max_output_tokens=max_output_tokens,
+        max_output_tokens=(
+            max_output_tokens
+            if max_output_tokens is not None
+            else settings.default_max_output_tokens
+        ),
     )
 
 

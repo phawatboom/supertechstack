@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from time import perf_counter
 from uuid import uuid4
@@ -7,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import get_database_session
+from app.config import Settings, get_settings
 from app.models.answer_trace import AnswerTrace
 from app.models.report import Report
 from app.models.workspace import Workspace
+from app.rate_limit import enforce_rate_limit
 from app.schemas.answer import (
     AnswerRequest,
     AnswerResponse,
@@ -27,38 +28,30 @@ from app.services.generation import (
     generate_grounded_answer,
 )
 from app.services.retrieval import RetrievedChunk, retrieve_chunks
+from app.security import Principal, get_owned_workspace
 
 router = APIRouter(tags=["answers"])
 
 
-def _env_flag(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-
-    if value is None:
-        return default
-
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-OBSERVABILITY_ENABLED = _env_flag("OBSERVABILITY_ENABLED", True)
-OBSERVABILITY_CAPTURE_CONTENT = _env_flag(
-    "OBSERVABILITY_CAPTURE_CONTENT",
-    True,
-)
+settings = get_settings()
+OBSERVABILITY_ENABLED = settings.observability_enabled
+OBSERVABILITY_CAPTURE_CONTENT = settings.observability_capture_content
 
 
 @router.get(
     "/answer-settings/defaults",
     response_model=AnswerDefaultsResponse,
 )
-def get_answer_defaults():
+def get_answer_defaults(
+    principal: Principal = Depends(enforce_rate_limit),
+):
     return AnswerDefaultsResponse(
         model=ANSWER_MODEL,
         instructions=DEFAULT_ANSWER_INSTRUCTIONS,
         input_template=DEFAULT_INPUT_TEMPLATE,
         retrieval_limit=5,
-        max_retrieval_limit=20,
-        max_output_tokens=None,
+        max_retrieval_limit=settings.max_retrieval_limit,
+        max_output_tokens=settings.default_max_output_tokens,
         save_report=True,
     )
 
@@ -118,12 +111,20 @@ def _mark_trace_failed(
 def answer_workspace(
     workspace_id: int,
     answer_input: AnswerRequest,
+    principal: Principal = Depends(enforce_rate_limit),
+    request_settings: Settings = Depends(get_settings),
     database_session: Session = Depends(get_database_session),
 ):
-    workspace = database_session.get(Workspace, workspace_id)
+    get_owned_workspace(workspace_id, principal, database_session)
 
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    if answer_input.model not in request_settings.allowed_answer_models:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Unsupported answer model. Allowed models: "
+                + ", ".join(request_settings.allowed_answer_models)
+            ),
+        )
 
     total_started_at = perf_counter()
     trace: AnswerTrace | None = None
@@ -318,12 +319,10 @@ def answer_workspace(
 )
 def list_reports(
     workspace_id: int,
+    principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
 ):
-    workspace = database_session.get(Workspace, workspace_id)
-
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    get_owned_workspace(workspace_id, principal, database_session)
 
     return (
         database_session.query(Report)
@@ -339,12 +338,10 @@ def list_reports(
 )
 def list_answer_traces(
     workspace_id: int,
+    principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
 ):
-    workspace = database_session.get(Workspace, workspace_id)
-
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    get_owned_workspace(workspace_id, principal, database_session)
 
     return (
         database_session.query(AnswerTrace)
@@ -361,9 +358,18 @@ def list_answer_traces(
 )
 def get_answer_trace(
     trace_id: str,
+    principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
 ):
-    trace = database_session.get(AnswerTrace, trace_id)
+    trace = (
+        database_session.query(AnswerTrace)
+        .join(Workspace, Workspace.id == AnswerTrace.workspace_id)
+        .filter(
+            AnswerTrace.id == trace_id,
+            Workspace.owner_id == principal.owner_id,
+        )
+        .first()
+    )
 
     if trace is None:
         raise HTTPException(status_code=404, detail="Answer trace not found")

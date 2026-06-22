@@ -1,25 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db.database import Base, engine
-from app.models import answer_trace, chunk, report, source, workspace
+from app.config import get_settings
 from app.routes.answers import router as answers_router
 from app.routes.search import router as search_router
 from app.routes.sources import router as sources_router
 from app.routes.uploads import router as uploads_router
 from app.routes.workspaces import router as workspaces_router
 
-
-Base.metadata.create_all(bind=engine)
+settings = get_settings()
 
 app = FastAPI(title="SuperTechStack")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=list(settings.allowed_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

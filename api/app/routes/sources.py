@@ -5,7 +5,9 @@ from app.db.database import get_database_session
 from app.models.chunk import Chunk
 from app.models.source import Source
 from app.models.workspace import Workspace
+from app.rate_limit import enforce_rate_limit
 from app.schemas.source import ChunkResponse, SourceCreate, SourceResponse
+from app.security import Principal, get_owned_workspace
 from app.services.source_ingestion import ingest_source_text
 
 router = APIRouter(tags=["sources"])
@@ -18,12 +20,10 @@ router = APIRouter(tags=["sources"])
 def create_source(
     workspace_id: int,
     source_input: SourceCreate,
+    principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
 ):
-    workspace = database_session.get(Workspace, workspace_id)
-
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    get_owned_workspace(workspace_id, principal, database_session)
 
     try:
         return ingest_source_text(
@@ -45,8 +45,10 @@ def create_source(
 )
 def list_sources(
     workspace_id: int,
+    principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
 ):
+    get_owned_workspace(workspace_id, principal, database_session)
     return (
         database_session.query(Source)
         .filter(Source.workspace_id == workspace_id)
@@ -61,8 +63,10 @@ def list_sources(
 )
 def list_chunks(
     workspace_id: int,
+    principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
 ):
+    get_owned_workspace(workspace_id, principal, database_session)
     return (
         database_session.query(Chunk)
         .filter(Chunk.workspace_id == workspace_id)
