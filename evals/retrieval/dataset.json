@@ -1,0 +1,32 @@
+[
+  {
+    "id": "rest-001",
+    "question": "What makes a REST API resource-oriented?",
+    "expected_source_titles": ["REST API Development"],
+    "notes": "The relevant source should explain resources, URIs, and HTTP methods."
+  },
+  {
+    "id": "rest-002",
+    "question": "Why is treating REST as JSON over HTTP insufficient?",
+    "expected_source_titles": ["REST API Development"],
+    "notes": "The retrieved passage should discuss REST constraints rather than only transport format."
+  },
+  {
+    "id": "rest-003",
+    "question": "How should HTTP status codes communicate API outcomes?",
+    "expected_source_titles": ["REST API Development"],
+    "notes": "Expect passages about meaningful success and error status codes."
+  },
+  {
+    "id": "rest-004",
+    "question": "What practices improve API versioning and compatibility?",
+    "expected_source_titles": ["REST API Development"],
+    "notes": "Expect versioning or backward-compatibility guidance."
+  },
+  {
+    "id": "rest-005",
+    "question": "What are common mistakes when designing REST APIs?",
+    "expected_source_titles": ["REST API Development"],
+    "notes": "Broad query used to check whether the main source is retrieved."
+  }
+]
