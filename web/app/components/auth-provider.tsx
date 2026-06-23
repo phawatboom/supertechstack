@@ -22,6 +22,13 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
 });
 
+function sessionsMatch(current: Session | null, next: Session | null) {
+  return (
+    current?.access_token === next?.access_token &&
+    current?.refresh_token === next?.refresh_token
+  );
+}
+
 export function useAuth() {
   return useContext(AuthContext);
 }
@@ -43,19 +50,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const supabase = getSupabaseClient();
+    let mounted = true;
 
     void supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) {
+        return;
+      }
+
       if (error) {
         void supabase.auth.signOut({ scope: "local" });
       }
-      setSession(data.session);
+      setSession((current) =>
+        sessionsMatch(current, data.session) ? current : data.session,
+      );
       setIsLoading(false);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      setSession(nextSession);
+      if (!mounted) {
+        return;
+      }
+
+      setSession((current) =>
+        sessionsMatch(current, nextSession) ? current : nextSession,
+      );
       setIsLoading(false);
 
       if (event === "SIGNED_OUT") {
@@ -63,7 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
