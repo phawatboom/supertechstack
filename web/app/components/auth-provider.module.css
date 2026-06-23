@@ -1,0 +1,8 @@
+.loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: #f6f7fb;
+  color: #64748b;
+  font-size: 14px;
+}
