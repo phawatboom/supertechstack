@@ -10,7 +10,7 @@ from app.config import Settings, get_settings
 from app.models.answer_trace import AnswerTrace
 from app.models.report import Report
 from app.models.workspace import Workspace
-from app.rate_limit import enforce_rate_limit
+from app.rate_limit import enforce_demo_answer_limit, enforce_rate_limit
 from app.schemas.answer import (
     AnswerRequest,
     AnswerResponse,
@@ -117,7 +117,22 @@ def answer_workspace(
 ):
     get_owned_workspace(workspace_id, principal, database_session)
 
-    if answer_input.model not in request_settings.allowed_answer_models:
+    if (
+        principal.is_demo
+        and len(answer_input.query) > request_settings.demo_max_query_chars
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Demo questions are limited to "
+                f"{request_settings.demo_max_query_chars} characters"
+            ),
+        )
+
+    if (
+        not principal.is_demo
+        and answer_input.model not in request_settings.allowed_answer_models
+    ):
         raise HTTPException(
             status_code=422,
             detail=(
@@ -126,10 +141,12 @@ def answer_workspace(
             ),
         )
 
+    enforce_demo_answer_limit(principal, request_settings)
+
     total_started_at = perf_counter()
     trace: AnswerTrace | None = None
 
-    if OBSERVABILITY_ENABLED:
+    if OBSERVABILITY_ENABLED and not principal.is_demo:
         trace = AnswerTrace(
             id=str(uuid4()),
             workspace_id=workspace_id,
@@ -151,7 +168,14 @@ def answer_workspace(
             database_session=database_session,
             workspace_id=workspace_id,
             query=answer_input.query,
-            limit=answer_input.limit,
+            limit=(
+                min(
+                    answer_input.limit,
+                    request_settings.demo_max_retrieval_limit,
+                )
+                if principal.is_demo
+                else answer_input.limit
+            ),
         )
     except Exception as error:
         _mark_trace_failed(
@@ -189,10 +213,30 @@ def answer_workspace(
     generation_request = build_generation_request(
         query=answer_input.query,
         retrieved_chunks=retrieved_chunks,
-        model=answer_input.model,
-        instructions=answer_input.instructions,
-        input_template=answer_input.input_template,
-        max_output_tokens=answer_input.max_output_tokens,
+        model=(
+            request_settings.default_answer_model
+            if principal.is_demo
+            else answer_input.model
+        ),
+        instructions=(
+            DEFAULT_ANSWER_INSTRUCTIONS
+            if principal.is_demo
+            else answer_input.instructions
+        ),
+        input_template=(
+            DEFAULT_INPUT_TEMPLATE
+            if principal.is_demo
+            else answer_input.input_template
+        ),
+        max_output_tokens=(
+            min(
+                answer_input.max_output_tokens
+                or request_settings.demo_max_output_tokens,
+                request_settings.demo_max_output_tokens,
+            )
+            if principal.is_demo
+            else answer_input.max_output_tokens
+        ),
     )
 
     if trace:
@@ -235,7 +279,7 @@ def answer_workspace(
     report_id: int | None = None
 
     try:
-        if answer_input.save_report:
+        if answer_input.save_report and not principal.is_demo:
             report = Report(
                 workspace_id=workspace_id,
                 query=answer_input.query,

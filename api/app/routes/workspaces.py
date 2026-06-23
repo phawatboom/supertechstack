@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.config import Settings, get_settings
 from app.db.database import get_database_session
 from app.models.workspace import Workspace
 from app.rate_limit import enforce_rate_limit
@@ -8,6 +9,30 @@ from app.schemas.workspace import WorkspaceCreate, WorkspaceResponse
 from app.security import Principal, get_owned_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+
+
+@router.get("/demo/public", response_model=WorkspaceResponse)
+def get_public_demo_workspace(
+    settings: Settings = Depends(get_settings),
+    database_session: Session = Depends(get_database_session),
+):
+    if not settings.demo_enabled:
+        raise HTTPException(status_code=404, detail="Demo is not enabled")
+
+    workspace = (
+        database_session.query(Workspace)
+        .filter(Workspace.owner_id == settings.demo_owner_id)
+        .order_by(Workspace.id)
+        .first()
+    )
+
+    if workspace is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Demo workspace has not been seeded",
+        )
+
+    return workspace
 
 @router.post("", response_model=WorkspaceResponse)
 def create_workspace(

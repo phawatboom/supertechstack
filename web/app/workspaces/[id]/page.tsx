@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   type FormEvent,
   useCallback,
@@ -11,6 +11,7 @@ import {
 } from "react";
 import styles from "./page.module.css";
 import { apiFetch } from "../../lib/api";
+import { useAuth } from "../../components/auth-provider";
 
 type Workspace = {
   id: number;
@@ -171,8 +172,11 @@ function TraceDataBlock({
 }
 
 export default function WorkspaceDetailPage() {
+  const { session, signOut } = useAuth();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const workspaceId = params.id;
+  const demoMode = searchParams.get("demo") === "1";
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
@@ -220,25 +224,38 @@ export default function WorkspaceDetailPage() {
   const closeDetailButtonRef = useRef<HTMLButtonElement>(null);
 
   const fetchWorkspaceData = useCallback(async () => {
-    const [
-      workspaceResponse,
-      sourcesResponse,
-      chunksResponse,
-      tracesResponse,
-      defaultsResponse,
-    ] = await Promise.all([
+    const [workspaceResponse, sourcesResponse, chunksResponse] =
+      await Promise.all([
         apiFetch(`/workspaces/${workspaceId}`),
         apiFetch(`/workspaces/${workspaceId}/sources`),
         apiFetch(`/workspaces/${workspaceId}/chunks`),
-        apiFetch(`/workspaces/${workspaceId}/answer-traces`),
-        apiFetch("/answer-settings/defaults"),
       ]);
 
-    const [workspaceData, sourcesData, chunksData, tracesData, defaultsData] =
-      await Promise.all([
+    const [workspaceData, sourcesData, chunksData] = await Promise.all([
       readResponse<Workspace>(workspaceResponse),
       readResponse<Source[]>(sourcesResponse),
       readResponse<Chunk[]>(chunksResponse),
+    ]);
+
+    if (demoMode) {
+      return {
+        workspaceData,
+        sourcesData,
+        chunksData,
+        tracesData: [] as AnswerTraceSummary[],
+        defaultsData: {
+          ...fallbackAnswerDefaults,
+          max_output_tokens: 500,
+          save_report: false,
+        },
+      };
+    }
+
+    const [tracesResponse, defaultsResponse] = await Promise.all([
+      apiFetch(`/workspaces/${workspaceId}/answer-traces`),
+      apiFetch("/answer-settings/defaults"),
+    ]);
+    const [tracesData, defaultsData] = await Promise.all([
       readResponse<AnswerTraceSummary[]>(tracesResponse),
       readResponse<AnswerDefaults>(defaultsResponse),
     ]);
@@ -250,7 +267,7 @@ export default function WorkspaceDetailPage() {
       tracesData,
       defaultsData,
     };
-  }, [workspaceId]);
+  }, [demoMode, workspaceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -482,22 +499,27 @@ export default function WorkspaceDetailPage() {
           body: JSON.stringify({
             query,
             limit: retrievalLimit,
-            save_report: saveAnswerReport,
+            save_report: demoMode ? false : saveAnswerReport,
             model: answerModel,
             instructions: answerInstructions,
             input_template: answerInputTemplate,
-            max_output_tokens:
-              maxOutputTokens === "" ? null : maxOutputTokens,
+            max_output_tokens: demoMode
+              ? 500
+              : maxOutputTokens === ""
+                ? null
+                : maxOutputTokens,
           }),
         },
       );
 
       const result = await readResponse<AnswerResult>(response);
       setAnswerResult(result);
-      await refreshAnswerTraces();
+      if (!demoMode) {
+        await refreshAnswerTraces();
 
-      if (result.trace_id) {
-        await viewAnswerTrace(result.trace_id);
+        if (result.trace_id) {
+          await viewAnswerTrace(result.trace_id);
+        }
       }
     } catch (error) {
       setAnswerError(
@@ -562,7 +584,20 @@ export default function WorkspaceDetailPage() {
         <Link href="/" className={styles.backLink}>
           <span aria-hidden="true">←</span> All workspaces
         </Link>
-        <span className={styles.workspaceId}>Workspace #{workspaceId}</span>
+        <div className={styles.navActions}>
+          <span className={styles.workspaceId}>
+            {demoMode ? "Public demo" : `Workspace #${workspaceId}`}
+          </span>
+          {session ? (
+            <button type="button" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          ) : (
+            <Link href="/auth" className={styles.signInAction}>
+              Create account
+            </Link>
+          )}
+        </div>
       </nav>
 
       <header className={styles.hero}>
@@ -589,6 +624,22 @@ export default function WorkspaceDetailPage() {
 
       <div className={styles.grid}>
         <div className={styles.primaryColumn}>
+          {demoMode && (
+            <section className={`${styles.card} ${styles.demoNotice}`}>
+              <div>
+                <p className={styles.step}>Live product demo</p>
+                <h2>Explore the normal workspace experience</h2>
+                <p>
+                  Sources are read-only. Each IP can make up to three semantic
+                  retrieval requests and one capped AI answer per day.
+                </p>
+              </div>
+              <Link href="/auth">Create a private workspace →</Link>
+            </section>
+          )}
+
+          {!demoMode && (
+            <>
           <section className={styles.card}>
             <div className={styles.sectionHeading}>
               <div>
@@ -734,6 +785,8 @@ export default function WorkspaceDetailPage() {
               </div>
             </form>
           </section>
+            </>
+          )}
 
           <section className={styles.card}>
             <div className={styles.sectionHeading}>
@@ -867,7 +920,7 @@ export default function WorkspaceDetailPage() {
                 />
               </label>
 
-              <details className={styles.advancedSettings}>
+              {!demoMode && <details className={styles.advancedSettings}>
                 <summary>
                   <span>
                     <strong>Advanced generation settings</strong>
@@ -981,7 +1034,7 @@ export default function WorkspaceDetailPage() {
                     />
                   </label>
                 </div>
-              </details>
+              </details>}
 
               {chunks.length === 0 && (
                 <p className={styles.hint}>
@@ -997,8 +1050,11 @@ export default function WorkspaceDetailPage() {
 
               <div className={styles.formFooter}>
                 <span>
-                  Uses up to {retrievalLimit} relevant{" "}
-                  {retrievalLimit === 1 ? "chunk" : "chunks"}
+                  {demoMode
+                    ? "Demo answers are limited to 500 output tokens"
+                    : `Uses up to ${retrievalLimit} relevant ${
+                        retrievalLimit === 1 ? "chunk" : "chunks"
+                      }`}
                 </span>
                 <button
                   type="submit"
@@ -1039,7 +1095,7 @@ export default function WorkspaceDetailPage() {
             )}
           </section>
 
-          <section className={styles.card}>
+          {!demoMode && <section className={styles.card}>
             <div className={styles.sectionHeading}>
               <div>
                 <p className={styles.step}>Observability</p>
@@ -1164,7 +1220,7 @@ export default function WorkspaceDetailPage() {
                 />
               </article>
             )}
-          </section>
+          </section>}
         </div>
 
         <aside className={styles.sidebar}>

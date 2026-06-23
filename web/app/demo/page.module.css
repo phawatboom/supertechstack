@@ -1,0 +1,48 @@
+.shell {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(79, 70, 229, 0.14), transparent 28rem),
+    #f6f7fb;
+}
+
+.card {
+  display: grid;
+  width: min(420px, 100%);
+  justify-items: center;
+  box-sizing: border-box;
+  padding: 38px;
+  border: 1px solid #dfe3ec;
+  border-radius: 20px;
+  background: #fff;
+  color: #64748b;
+  text-align: center;
+  box-shadow: 0 20px 55px rgba(30, 41, 59, 0.09);
+}
+
+.logo {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 10px;
+  place-items: center;
+  border-radius: 13px;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 800;
+}
+
+.card strong {
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.card a {
+  margin-top: 16px;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+}

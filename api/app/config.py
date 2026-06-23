@@ -56,6 +56,16 @@ class Settings:
     auth_mode: str
     beta_access_tokens: tuple[str, ...]
     beta_owner_id: str
+    supabase_url: str
+    supabase_jwt_audience: str
+    demo_enabled: bool
+    demo_owner_id: str
+    demo_embedding_requests: int
+    demo_answer_requests: int
+    demo_window_seconds: int
+    demo_max_output_tokens: int
+    demo_max_retrieval_limit: int
+    demo_max_query_chars: int
     max_upload_size_bytes: int
     allowed_answer_models: tuple[str, ...]
     default_answer_model: str
@@ -85,8 +95,10 @@ def get_settings() -> Settings:
         "beta" if environment == "production" else "disabled",
     ).strip().lower()
 
-    if auth_mode not in {"disabled", "beta"}:
-        raise RuntimeError("AUTH_MODE must be either 'disabled' or 'beta'")
+    if auth_mode not in {"disabled", "beta", "supabase"}:
+        raise RuntimeError(
+            "AUTH_MODE must be 'disabled', 'beta', or 'supabase'"
+        )
 
     beta_access_tokens = _csv("BETA_ACCESS_TOKENS", "")
 
@@ -98,6 +110,11 @@ def get_settings() -> Settings:
             "BETA_ACCESS_TOKENS must contain at least one token "
             "when AUTH_MODE=beta"
         )
+
+    supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+
+    if auth_mode == "supabase" and not supabase_url:
+        raise RuntimeError("SUPABASE_URL is required when AUTH_MODE=supabase")
 
     allowed_answer_models = _csv(
         "ALLOWED_OPENAI_ANSWER_MODELS",
@@ -135,6 +152,31 @@ def get_settings() -> Settings:
         auth_mode=auth_mode,
         beta_access_tokens=beta_access_tokens,
         beta_owner_id=os.getenv("BETA_OWNER_ID", "beta-user").strip(),
+        supabase_url=supabase_url,
+        supabase_jwt_audience=os.getenv(
+            "SUPABASE_JWT_AUDIENCE",
+            "authenticated",
+        ).strip(),
+        demo_enabled=_boolean("DEMO_ENABLED", False),
+        demo_owner_id=os.getenv(
+            "DEMO_OWNER_ID",
+            "public-demo",
+        ).strip(),
+        demo_embedding_requests=_integer(
+            "DEMO_EMBEDDING_REQUESTS",
+            3,
+        ),
+        demo_answer_requests=_integer("DEMO_ANSWER_REQUESTS", 1),
+        demo_window_seconds=_integer("DEMO_WINDOW_SECONDS", 86_400),
+        demo_max_output_tokens=_integer(
+            "DEMO_MAX_OUTPUT_TOKENS",
+            500,
+        ),
+        demo_max_retrieval_limit=_integer(
+            "DEMO_MAX_RETRIEVAL_LIMIT",
+            5,
+        ),
+        demo_max_query_chars=_integer("DEMO_MAX_QUERY_CHARS", 1_000),
         max_upload_size_bytes=_integer(
             "MAX_UPLOAD_SIZE_BYTES",
             60 * 1024 * 1024,

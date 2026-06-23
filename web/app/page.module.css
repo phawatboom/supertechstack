@@ -45,25 +45,41 @@
   box-shadow: 0 8px 18px rgba(79, 70, 229, 0.25);
 }
 
-.status {
+.headerActions {
   display: inline-flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  padding: 7px 11px;
-  border: 1px solid rgba(219, 224, 234, 0.9);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.76);
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
 }
 
-.status i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+.headerActions a,
+.headerActions button {
+  padding: 7px 11px;
+  border: 1px solid rgba(219, 224, 234, 0.9);
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.76);
+  color: #64748b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.headerActions a:hover,
+.headerActions button:hover {
+  border-color: #a5b4fc;
+  color: #4338ca;
+}
+
+.headerActions .signInLink {
+  border-color: #4f46e5;
+  background: #4f46e5;
+  color: #fff;
+}
+
+.headerActions .signInLink:hover {
+  background: #4338ca;
+  color: #fff;
 }
 
 .hero {
@@ -128,6 +144,42 @@
   font-style: normal;
 }
 
+.heroActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.primaryAction,
+.secondaryAction,
+.demoCardButton {
+  display: inline-flex;
+  min-height: 44px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.primaryAction,
+.demoCardButton {
+  background: #4f46e5;
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(79, 70, 229, 0.2);
+}
+
+.secondaryAction {
+  border: 1px solid #d8deea;
+  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+}
+
 .createCard {
   padding: clamp(24px, 3vw, 32px);
   border: 1px solid rgba(219, 224, 234, 0.95);
@@ -171,6 +223,27 @@
   color: #64748b;
   font-size: 13px;
   line-height: 1.65;
+}
+
+.demoCardBody ul {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 26px;
+  padding: 0;
+  color: #475569;
+  font-size: 13px;
+  list-style: none;
+}
+
+.demoCardBody li::before {
+  margin-right: 9px;
+  color: #4f46e5;
+  content: "✓";
+  font-weight: 800;
+}
+
+.demoCardButton {
+  width: 100%;
 }
 
 .form {
@@ -472,7 +545,16 @@
     margin-bottom: 48px;
   }
 
-  .status {
+  .headerActions {
+    gap: 6px;
+  }
+
+  .headerActions a,
+  .headerActions button {
+    padding-inline: 9px;
+  }
+
+  .headerActions .demoLink {
     display: none;
   }
 

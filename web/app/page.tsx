@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useAuth } from "./components/auth-provider";
 import { apiFetch } from "./lib/api";
 import styles from "./page.module.css";
 
@@ -40,6 +41,7 @@ async function readResponse<T>(response: Response): Promise<T> {
 }
 
 export default function HomePage() {
+  const { session, signOut } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceDescription, setWorkspaceDescription] = useState("");
@@ -53,6 +55,12 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    if (!session) {
+      setWorkspaces([]);
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     void fetchWorkspaces()
@@ -79,7 +87,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [fetchWorkspaces]);
+  }, [fetchWorkspaces, session]);
 
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,10 +139,20 @@ export default function HomePage() {
           <span>Supertechstack</span>
         </Link>
 
-        <span className={styles.status}>
-          <i aria-hidden="true" />
-          Research system
-        </span>
+        <div className={styles.headerActions}>
+          <Link href="/demo" className={styles.demoLink}>
+            View demo
+          </Link>
+          {session ? (
+            <button type="button" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          ) : (
+            <Link href="/auth" className={styles.signInLink}>
+              Sign in
+            </Link>
+          )}
+        </div>
       </header>
 
       <section className={styles.hero}>
@@ -158,25 +176,37 @@ export default function HomePage() {
               <i aria-hidden="true">✓</i> Saved reports
             </span>
           </div>
+          <div className={styles.heroActions}>
+            <Link href="/demo" className={styles.primaryAction}>
+              Explore demo workspace <span aria-hidden="true">→</span>
+            </Link>
+            {!session && (
+              <Link href="/auth" className={styles.secondaryAction}>
+                Create an account
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className={styles.createCard}>
           <div className={styles.cardHeader}>
             <div>
-              <p className={styles.step}>Get started</p>
-              <h2>Create a workspace</h2>
+              <p className={styles.step}>{session ? "Get started" : "Live product tour"}</p>
+              <h2>{session ? "Create a workspace" : "See grounded research in action"}</h2>
             </div>
             <span className={styles.cardIcon} aria-hidden="true">
               +
             </span>
           </div>
 
-          <p className={styles.cardDescription}>
-            Give your research a clear scope. You can add and index sources
-            after creating it.
-          </p>
+          {session ? (
+            <>
+              <p className={styles.cardDescription}>
+                Give your research a clear scope. You can add and index sources
+                after creating it.
+              </p>
 
-          <form onSubmit={createWorkspace} className={styles.form}>
+              <form onSubmit={createWorkspace} className={styles.form}>
             <label>
               Workspace name
               <input
@@ -213,11 +243,28 @@ export default function HomePage() {
               {isCreating ? "Creating workspace…" : "Create workspace"}
               {!isCreating && <span aria-hidden="true">→</span>}
             </button>
-          </form>
+              </form>
+            </>
+          ) : (
+            <div className={styles.demoCardBody}>
+              <p className={styles.cardDescription}>
+                Open a read-only workspace with sample sources, semantic matches,
+                and a cited answer. No account or database access is required.
+              </p>
+              <ul>
+                <li>Review indexed source material</li>
+                <li>Inspect semantic retrieval scores</li>
+                <li>See a grounded answer with citations</li>
+              </ul>
+              <Link href="/demo" className={styles.demoCardButton}>
+                Open demo workspace <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
-      <section className={styles.workspaceSection}>
+      {session && <section className={styles.workspaceSection}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.eyebrow}>Library</p>
@@ -278,7 +325,7 @@ export default function HomePage() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
     </main>
   );
 }
