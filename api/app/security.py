@@ -62,6 +62,7 @@ def _verify_supabase_token(token: str, settings: Settings) -> str:
             audience=settings.supabase_jwt_audience,
             issuer=f"{settings.supabase_url}/auth/v1",
             options={"require": ["exp", "iss", "sub"]},
+            leeway=settings.jwt_clock_skew_seconds,
         )
         owner_id = claims.get("sub")
 

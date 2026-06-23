@@ -58,6 +58,7 @@ class Settings:
     beta_owner_id: str
     supabase_url: str
     supabase_jwt_audience: str
+    jwt_clock_skew_seconds: int
     demo_enabled: bool
     demo_owner_id: str
     demo_embedding_requests: int
@@ -157,6 +158,11 @@ def get_settings() -> Settings:
             "SUPABASE_JWT_AUDIENCE",
             "authenticated",
         ).strip(),
+        jwt_clock_skew_seconds=_integer(
+            "JWT_CLOCK_SKEW_SECONDS",
+            30,
+            minimum=0,
+        ),
         demo_enabled=_boolean("DEMO_ENABLED", False),
         demo_owner_id=os.getenv(
             "DEMO_OWNER_ID",

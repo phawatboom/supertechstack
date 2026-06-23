@@ -24,6 +24,7 @@ def make_settings(**overrides) -> Settings:
         "beta_owner_id": "beta-user",
         "supabase_url": "https://example.supabase.co",
         "supabase_jwt_audience": "authenticated",
+        "jwt_clock_skew_seconds": 30,
         "demo_enabled": False,
         "demo_owner_id": "public-demo",
         "demo_embedding_requests": 3,
@@ -130,6 +131,42 @@ def test_supabase_verifier_checks_signed_claims(monkeypatch):
     )
 
     assert _verify_supabase_token(token, settings) == "verified-user"
+
+
+def test_supabase_verifier_allows_small_clock_skew(monkeypatch):
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+
+    class SigningKey:
+        key = public_key
+
+    class JwksClient:
+        def get_signing_key_from_jwt(self, token):
+            return SigningKey()
+
+    monkeypatch.setattr(
+        "app.security._jwks_client",
+        lambda supabase_url: JwksClient(),
+    )
+
+    settings = make_settings(jwt_clock_skew_seconds=30)
+    token = jwt.encode(
+        {
+            "sub": "clock-skew-user",
+            "aud": "authenticated",
+            "iss": "https://example.supabase.co/auth/v1",
+            "iat": datetime.now(timezone.utc) + timedelta(seconds=20),
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        },
+        private_key,
+        algorithm="RS256",
+        headers={"kid": "test-key"},
+    )
+
+    assert _verify_supabase_token(token, settings) == "clock-skew-user"
 
 
 def test_public_demo_allows_only_allowlisted_workspace_routes():
