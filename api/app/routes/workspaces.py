@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
@@ -39,14 +40,55 @@ def create_workspace(
     workspace_input:WorkspaceCreate,
     principal: Principal = Depends(enforce_rate_limit),
     database_session: Session = Depends(get_database_session),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=64,
+    ),
 ):
+    if idempotency_key is not None:
+        existing_workspace = (
+            database_session.query(Workspace)
+            .filter(
+                Workspace.owner_id == principal.owner_id,
+                Workspace.creation_key == idempotency_key,
+            )
+            .first()
+        )
+
+        if existing_workspace is not None:
+            return existing_workspace
+
     workspace = Workspace(
         owner_id=principal.owner_id,
         name=workspace_input.name,
         description=workspace_input.description,
+        creation_key=idempotency_key,
     )
     database_session.add(workspace)
-    database_session.commit()
+    try:
+        database_session.commit()
+    except IntegrityError:
+        database_session.rollback()
+
+        if idempotency_key is None:
+            raise
+
+        existing_workspace = (
+            database_session.query(Workspace)
+            .filter(
+                Workspace.owner_id == principal.owner_id,
+                Workspace.creation_key == idempotency_key,
+            )
+            .first()
+        )
+
+        if existing_workspace is None:
+            raise
+
+        return existing_workspace
+
     database_session.refresh(workspace)
 
     return workspace
