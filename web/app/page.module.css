@@ -100,20 +100,20 @@
 }
 
 .hero h1 {
-  max-width: 680px;
+  max-width: 620px;
   margin: 0;
   color: #111827;
-  font-size: clamp(42px, 6vw, 68px);
-  line-height: 1.02;
-  letter-spacing: -0.055em;
+  font-size: clamp(40px, 4.8vw, 56px);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
 }
 
 .heroDescription {
-  max-width: 620px;
-  margin: 24px 0 0;
+  max-width: 560px;
+  margin: 22px 0 0;
   color: #64748b;
-  font-size: clamp(16px, 2vw, 18px);
-  line-height: 1.75;
+  font-size: clamp(15px, 1.5vw, 17px);
+  line-height: 1.65;
 }
 
 .featureList {
@@ -563,7 +563,8 @@
   }
 
   .hero h1 {
-    font-size: 42px;
+    font-size: 38px;
+    line-height: 1.1;
   }
 
   .featureList {
