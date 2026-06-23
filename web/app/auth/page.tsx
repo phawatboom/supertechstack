@@ -17,12 +17,16 @@ export default function AuthPage() {
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.slice(1));
+    const requestedMode = query.get("mode");
     const description =
       query.get("error_description") ?? hash.get("error_description");
 
+    if (requestedMode === "sign-up") {
+      setMode("sign-up");
+    }
+
     if (description) {
       setConfirmationError(description.replaceAll("+", " "));
-      window.history.replaceState({}, "", "/auth");
     }
   }, []);
 
@@ -32,6 +36,13 @@ export default function AuthPage() {
     setMessage("");
 
     const supabase = getSupabaseClient();
+    const next = new URLSearchParams(window.location.search).get("next");
+    const confirmationUrl = new URL("/auth", window.location.origin);
+
+    if (next) {
+      confirmationUrl.searchParams.set("next", next);
+    }
+
     const result =
       mode === "sign-in"
         ? await supabase.auth.signInWithPassword({ email, password })
@@ -39,7 +50,7 @@ export default function AuthPage() {
             email,
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/auth`,
+              emailRedirectTo: confirmationUrl.toString(),
             },
           });
 

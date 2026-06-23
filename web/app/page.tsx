@@ -1,9 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useAuth } from "./components/auth-provider";
 import { apiFetch } from "./lib/api";
+import {
+  clearPendingWorkspace,
+  readPendingWorkspace,
+  savePendingWorkspace,
+} from "./lib/pending-workspace";
 import styles from "./page.module.css";
 
 type Workspace = {
@@ -41,7 +53,9 @@ async function readResponse<T>(response: Response): Promise<T> {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const { session, signOut } = useAuth();
+  const pendingCreationStarted = useRef(false);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceDescription, setWorkspaceDescription] = useState("");
@@ -53,6 +67,26 @@ export default function HomePage() {
     const response = await apiFetch("/workspaces");
     return readResponse<Workspace[]>(response);
   }, []);
+
+  const postWorkspace = useCallback(
+    async (
+      name: string,
+      description: string | null,
+      requestId: string,
+    ) => {
+      const response = await apiFetch("/workspaces", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": requestId,
+        },
+        body: JSON.stringify({ name, description }),
+      });
+
+      return readResponse<Workspace>(response);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!session) {
@@ -89,6 +123,46 @@ export default function HomePage() {
     };
   }, [fetchWorkspaces, session]);
 
+  useEffect(() => {
+    if (!session || pendingCreationStarted.current) {
+      return;
+    }
+
+    const pendingWorkspace = readPendingWorkspace();
+
+    if (!pendingWorkspace) {
+      return;
+    }
+
+    pendingCreationStarted.current = true;
+    clearPendingWorkspace();
+    setIsCreating(true);
+    setErrorMessage("");
+
+    void postWorkspace(
+      pendingWorkspace.name,
+      pendingWorkspace.description,
+      pendingWorkspace.requestId,
+    )
+      .then((workspace) => {
+        router.replace(`/workspaces/${workspace.id}`);
+      })
+      .catch((error: unknown) => {
+        savePendingWorkspace(pendingWorkspace);
+        setWorkspaceName(pendingWorkspace.name);
+        setWorkspaceDescription(pendingWorkspace.description ?? "");
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to create workspace.",
+        );
+        pendingCreationStarted.current = false;
+      })
+      .finally(() => {
+        setIsCreating(false);
+      });
+  }, [postWorkspace, router, session]);
+
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -100,20 +174,25 @@ export default function HomePage() {
       return;
     }
 
+    if (!session) {
+      savePendingWorkspace({
+        name,
+        description: description || null,
+        requestId: crypto.randomUUID(),
+      });
+      router.push("/auth?mode=sign-up&next=create-workspace");
+      return;
+    }
+
     setIsCreating(true);
     setErrorMessage("");
 
     try {
-      const response = await apiFetch("/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          description: description || null,
-        }),
-      });
-
-      const workspace = await readResponse<Workspace>(response);
+      const workspace = await postWorkspace(
+        name,
+        description || null,
+        crypto.randomUUID(),
+      );
 
       setWorkspaceName("");
       setWorkspaceDescription("");
@@ -181,7 +260,7 @@ export default function HomePage() {
               Explore demo workspace <span aria-hidden="true">→</span>
             </Link>
             {!session && (
-              <Link href="/auth" className={styles.secondaryAction}>
+              <Link href="/auth?mode=sign-up" className={styles.secondaryAction}>
                 Create an account
               </Link>
             )}
@@ -191,22 +270,20 @@ export default function HomePage() {
         <div className={styles.createCard}>
           <div className={styles.cardHeader}>
             <div>
-              <p className={styles.step}>{session ? "Get started" : "Live product tour"}</p>
-              <h2>{session ? "Create a workspace" : "See grounded research in action"}</h2>
+              <p className={styles.step}>Get started</p>
+              <h2>Create a workspace</h2>
             </div>
             <span className={styles.cardIcon} aria-hidden="true">
               +
             </span>
           </div>
 
-          {session ? (
-            <>
-              <p className={styles.cardDescription}>
-                Give your research a clear scope. You can add and index sources
-                after creating it.
-              </p>
+          <p className={styles.cardDescription}>
+            Give your research a clear scope. You can add and index sources
+            after creating it.
+          </p>
 
-              <form onSubmit={createWorkspace} className={styles.form}>
+          <form onSubmit={createWorkspace} className={styles.form}>
             <label>
               Workspace name
               <input
@@ -243,24 +320,7 @@ export default function HomePage() {
               {isCreating ? "Creating workspace…" : "Create workspace"}
               {!isCreating && <span aria-hidden="true">→</span>}
             </button>
-              </form>
-            </>
-          ) : (
-            <div className={styles.demoCardBody}>
-              <p className={styles.cardDescription}>
-                Open a read-only workspace with sample sources, semantic matches,
-                and a cited answer. No account or database access is required.
-              </p>
-              <ul>
-                <li>Review indexed source material</li>
-                <li>Inspect semantic retrieval scores</li>
-                <li>See a grounded answer with citations</li>
-              </ul>
-              <Link href="/demo" className={styles.demoCardButton}>
-                Open demo workspace <span aria-hidden="true">→</span>
-              </Link>
-            </div>
-          )}
+          </form>
         </div>
       </section>
 
