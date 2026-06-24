@@ -237,11 +237,10 @@ export default function HomePage() {
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <p className={styles.eyebrow}>Your research, organized</p>
-          <h1>Turn scattered sources into clear, grounded insight.</h1>
+          <h1>Turn scattered sources into clear, grounded insights.</h1>
           <p className={styles.heroDescription}>
-            Build focused workspaces, index source material, and generate
-            evidence-backed answers without losing track of where they came
-            from.
+            Build focused workspaces, organise your sources, and generate
+            evidence-backed answers.
           </p>
 
           <div className={styles.featureList}>

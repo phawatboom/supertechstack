@@ -78,10 +78,10 @@ export default function AuthPage() {
 
         <div className={styles.productCopy}>
           <p className={styles.eyebrow}>Research you can verify</p>
-          <h1>Move from scattered sources to grounded decisions.</h1>
+          <h1>A Source-Grounded Research Workspace</h1>
           <p>
-            Build a private research library, retrieve the right evidence, and
-            generate answers that stay connected to their sources.
+            Build a research library, retrieve the evidence, and
+            generate answers backed by clear citations.
           </p>
           <Link href="/demo" className={styles.demoButton}>
             Explore the live demo <span aria-hidden="true">→</span>
@@ -91,15 +91,15 @@ export default function AuthPage() {
         <div className={styles.benefits}>
           <div>
             <span aria-hidden="true">01</span>
-            <p><strong>Private workspaces</strong>Your account owns its data.</p>
+            <p><strong>Private workspaces</strong>Keep your research private and organised.</p>
           </div>
           <div>
             <span aria-hidden="true">02</span>
-            <p><strong>Traceable answers</strong>Inspect evidence and citations.</p>
+            <p><strong>Traceable answers</strong>Review evidence and citations.</p>
           </div>
           <div>
             <span aria-hidden="true">03</span>
-            <p><strong>Semantic retrieval</strong>Find meaning, not only keywords.</p>
+            <p><strong>Semantic retrieval</strong>Find meaning, not just keywords.</p>
           </div>
         </div>
       </section>
