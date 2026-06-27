@@ -1,10 +1,80 @@
 from datetime import datetime
 from typing import Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 NewsFrequency = Literal["manual", "daily"]
+
+
+def canonicalize_news_url(value: str) -> str:
+    parsed_url = urlsplit(value.strip())
+    scheme = parsed_url.scheme.lower()
+    hostname = parsed_url.hostname.lower() if parsed_url.hostname else ""
+
+    if not scheme or not hostname:
+        raise ValueError("URL must include a scheme and hostname")
+
+    if scheme not in {"http", "https"}:
+        raise ValueError("URL must use http or https")
+
+    netloc = hostname
+
+    if parsed_url.port:
+        is_default_port = (
+            (scheme == "http" and parsed_url.port == 80)
+            or (scheme == "https" and parsed_url.port == 443)
+        )
+        if not is_default_port:
+            netloc = f"{netloc}:{parsed_url.port}"
+
+    query_params = [
+        (key, value)
+        for key, value in parse_qsl(parsed_url.query, keep_blank_values=True)
+        if not key.lower().startswith("utm_")
+    ]
+    query = urlencode(sorted(query_params), doseq=True)
+    path = parsed_url.path or "/"
+
+    return urlunsplit((scheme, netloc, path, query, ""))
+
+
+class NewsSearchResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=500)
+    url: str = Field(min_length=1, max_length=2_000)
+    canonical_url: str = Field(min_length=1, max_length=2_000)
+    snippet: str | None = Field(default=None, max_length=2_000)
+    publisher: str | None = Field(default=None, max_length=255)
+    published_at: datetime | None = None
+    provider: str = Field(min_length=1, max_length=100)
+    external_id: str | None = Field(default=None, max_length=255)
+
+    @field_validator("title", "url", "canonical_url", "provider")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Value cannot be blank")
+
+        return value
+
+    @field_validator("snippet", "publisher", "external_id")
+    @classmethod
+    def strip_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        value = value.strip()
+        return value or None
+
+    @field_validator("url", "canonical_url")
+    @classmethod
+    def validate_http_url(cls, value: str) -> str:
+        return canonicalize_news_url(value)
 
 
 class NewsSearchConfigCreate(BaseModel):
