@@ -69,3 +69,7 @@ class PostResponse(BaseModel):
 
 class PublicFeedPostResponse(PostResponse):
     workspace_name: str
+
+
+class PublicPostResponse(PublicFeedPostResponse):
+    source_title: str | None

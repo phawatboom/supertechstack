@@ -11,6 +11,7 @@ from app.rate_limit import enforce_rate_limit
 from app.schemas.post import (
     CreatePostFromSourceRequest,
     PublicFeedPostResponse,
+    PublicPostResponse,
     PostResponse,
     PostUpdate,
 )
@@ -70,6 +71,39 @@ def list_public_feed_posts(
         )
         for post, workspace_name in rows
     ]
+
+
+@router.get(
+    "/posts/{post_id}",
+    response_model=PublicPostResponse,
+)
+def get_public_post(
+    post_id: int,
+    database_session: Session = Depends(get_database_session),
+):
+    row = (
+        database_session.query(Post, Workspace.name, Source.title)
+        .join(Workspace, Workspace.id == Post.workspace_id)
+        .outerjoin(Source, Source.id == Post.source_id)
+        .filter(
+            Post.id == post_id,
+            Post.status == "published",
+            Post.visibility.in_(["public", "unlisted"]),
+        )
+        .first()
+    )
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    post, workspace_name, source_title = row
+    return PublicPostResponse.model_validate(
+        {
+            **post.__dict__,
+            "workspace_name": workspace_name,
+            "source_title": source_title,
+        }
+    )
 
 
 @router.post(

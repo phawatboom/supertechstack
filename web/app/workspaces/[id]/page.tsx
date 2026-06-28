@@ -1129,14 +1129,22 @@ export default function WorkspaceDetailPage() {
                       {isSavingPost ? "Saving..." : "Save draft"}
                     </button>
                     {activePost.status === "published" ? (
-                      <button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={() => void saveActivePost("draft")}
-                        disabled={isSavingPost}
-                      >
-                        Unpublish
-                      </button>
+                      <>
+                        <Link
+                          href={`/posts/${activePost.id}`}
+                          className={styles.postPublicLink}
+                        >
+                          View post
+                        </Link>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => void saveActivePost("draft")}
+                          disabled={isSavingPost}
+                        >
+                          Unpublish
+                        </button>
+                      </>
                     ) : (
                       <button
                         type="button"

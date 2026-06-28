@@ -413,9 +413,7 @@ export default function HomePage() {
                       post.markdown_content.slice(0, 220)}
                   </p>
                 </div>
-                <Link href={`/workspaces/${post.workspace_id}`}>
-                  Open workspace
-                </Link>
+                <Link href={`/posts/${post.id}`}>Read post</Link>
               </article>
             ))}
           </div>
