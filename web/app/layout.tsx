@@ -22,6 +22,20 @@ export const metadata: Metadata = {
   description:
     "Organize sources, search semantically, and generate evidence-backed research reports.",
   applicationName: "SuperTechStack",
+  icons: {
+    icon: [
+      {
+        url: "/phoenix-favicon-final.ico",
+        type: "image/x-icon",
+      },
+      {
+        url: "/phoenix-favicon-final.png",
+        type: "image/png",
+      },
+    ],
+    shortcut: "/phoenix-favicon-final.ico",
+    apple: "/phoenix-favicon-final.png",
+  },
   openGraph: {
     type: "website",
     url: "/",
