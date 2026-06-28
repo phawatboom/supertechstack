@@ -789,9 +789,12 @@ export default function WorkspaceDetailPage() {
               onSubmit={updateWorkspace}
               className={styles.workspaceEditForm}
             >
-              <p className={styles.eyebrow}>Edit workspace</p>
+              <div className={styles.workspaceEditHeader}>
+                <p className={styles.eyebrow}>Research workspace</p>
+                <span>Editing details</span>
+              </div>
               <label>
-                Name
+                <span>Name</span>
                 <input
                   value={workspaceName}
                   onChange={(event) => setWorkspaceName(event.target.value)}
@@ -800,7 +803,7 @@ export default function WorkspaceDetailPage() {
                 />
               </label>
               <label>
-                Description
+                <span>Description</span>
                 <textarea
                   value={workspaceDescription}
                   onChange={(event) =>
@@ -1502,7 +1505,7 @@ export default function WorkspaceDetailPage() {
                         }}
                       >
                         <label>
-                          Source name
+                          <span>Source name</span>
                           <input
                             value={sourceEditTitle}
                             onChange={(event) =>

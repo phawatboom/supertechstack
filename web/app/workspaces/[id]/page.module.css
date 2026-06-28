@@ -139,20 +139,37 @@
 .workspaceEditForm {
   display: grid;
   width: min(680px, 100%);
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 16px 40px rgba(30, 41, 59, 0.08);
+  gap: 10px;
+}
+
+.workspaceEditHeader {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.workspaceEditHeader span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 750;
 }
 
 .workspaceEditForm label {
-  display: grid;
-  gap: 7px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
   color: #334155;
   font-size: 12px;
   font-weight: 750;
+}
+
+.workspaceEditForm label > span {
+  width: 82px;
+  flex: 0 0 auto;
+  padding-top: 10px;
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
 }
 
 .workspaceEditForm input,
@@ -169,13 +186,15 @@
 }
 
 .workspaceEditForm input {
-  min-height: 43px;
-  padding: 0 13px;
+  max-width: 420px;
+  min-height: 40px;
+  padding: 0 12px;
 }
 
 .workspaceEditForm textarea {
-  min-height: 78px;
-  padding: 11px 13px;
+  max-width: 520px;
+  min-height: 52px;
+  padding: 9px 12px;
   resize: vertical;
 }
 
@@ -189,13 +208,14 @@
 .inlineActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  padding-left: 94px;
 }
 
 .inlineActions button {
-  min-height: 40px;
-  padding: 0 13px;
+  min-height: 34px;
+  padding: 0 11px;
   border: 0;
   border-radius: 10px;
   cursor: pointer;
@@ -783,27 +803,35 @@
 }
 
 .sourceEditForm {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
   margin-top: 10px;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #fbfcfe;
+  flex-wrap: wrap;
 }
 
 .sourceEditForm label {
-  display: grid;
-  gap: 7px;
+  display: flex;
+  flex: 1 1 180px;
+  gap: 8px;
+  align-items: center;
   color: #334155;
   font-size: 11px;
   font-weight: 800;
 }
 
+.sourceEditForm label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 .sourceEditForm input {
   width: 100%;
   box-sizing: border-box;
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 11px;
   border: 1px solid #d8deea;
   border-radius: 10px;
@@ -819,6 +847,7 @@
 }
 
 .inlineError {
+  flex-basis: 100%;
   margin: 0;
   color: #b91c1c;
   font-size: 11px;
@@ -859,8 +888,8 @@
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  min-height: 30px;
-  margin-top: 12px;
+  min-height: 28px;
+  margin-top: 10px;
   padding: 0;
   border: 0;
   cursor: pointer;
@@ -911,8 +940,16 @@
 .sourceActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 10px;
   align-items: center;
+}
+
+.sourceEditForm .sourceActions {
+  margin-left: auto;
+}
+
+.sourceEditForm .sourceActions button {
+  margin-top: 0;
 }
 
 .sourceActions .renameButton,
@@ -1486,6 +1523,33 @@
 
   .hero h1 {
     font-size: 34px;
+  }
+
+  .workspaceEditForm label {
+    display: grid;
+    gap: 7px;
+  }
+
+  .workspaceEditForm label > span {
+    width: auto;
+    padding-top: 0;
+  }
+
+  .workspaceEditForm input,
+  .workspaceEditForm textarea {
+    max-width: none;
+  }
+
+  .inlineActions {
+    padding-left: 0;
+  }
+
+  .sourceEditForm {
+    display: grid;
+  }
+
+  .sourceEditForm .sourceActions {
+    margin-left: 0;
   }
 
   .stats {
