@@ -19,6 +19,8 @@ class Source(Base):
         server_default="pasted_text",
     )
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    markdown_content: Mapped[str] = mapped_column(Text, nullable=False)
+    plain_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     original_filename: Mapped[str | None] = mapped_column(
         String(255),

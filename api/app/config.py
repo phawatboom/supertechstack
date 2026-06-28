@@ -77,8 +77,8 @@ class Settings:
     rate_limit_window_seconds: int
     observability_enabled: bool
     observability_capture_content: bool
-    news_search_provider: str
-    news_search_timeout_seconds: int
+    news_search_provider: str = "disabled"
+    news_search_timeout_seconds: int = 10
 
     @property
     def is_production(self) -> bool:

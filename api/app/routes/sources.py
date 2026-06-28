@@ -31,6 +31,7 @@ def create_source(
             workspace_id=workspace_id,
             title=source_input.title,
             raw_text=source_input.raw_text,
+            markdown_content=source_input.markdown_content,
             source_type="pasted_text",
         )
     except ValueError as error:

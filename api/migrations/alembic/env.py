@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.config import get_settings
 from app.db.database import Base
-from app.models import answer_trace, chunk, news, report, source, workspace
+from app.models import answer_trace, chunk, news, post, report, source, workspace
 
 config = context.config
 settings = get_settings()

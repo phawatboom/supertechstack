@@ -148,10 +148,12 @@ def discover_news(
     query = discovery_input.query
     max_results = discovery_input.max_results
 
-    if query is None or max_results is None:
+    if query is None:
         config = _get_news_config(workspace_id, database_session)
-        query = query or config.query
+        query = config.query
         max_results = max_results or config.max_results_per_run
+    else:
+        max_results = max_results or 10
 
     try:
         results = discover_news_results(
