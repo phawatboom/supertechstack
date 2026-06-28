@@ -26,6 +26,24 @@ type Workspace = {
   updated_at: string;
 };
 
+type PublicFeedPost = {
+  id: number;
+  workspace_id: number;
+  source_id: number | null;
+  author_id: string;
+  title: string;
+  slug: string;
+  markdown_content: string;
+  excerpt: string | null;
+  cover_image_url: string | null;
+  visibility: "private" | "workspace" | "public";
+  status: "draft" | "published" | "archived";
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  workspace_name: string;
+};
+
 const workspaceMarks = [
   styles.mark1,
   styles.mark2,
@@ -62,6 +80,9 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [feedPosts, setFeedPosts] = useState<PublicFeedPost[]>([]);
+  const [isFeedLoading, setIsFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState("");
 
   const fetchWorkspaces = useCallback(async () => {
     const response = await apiFetch("/workspaces");
@@ -122,6 +143,34 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [fetchWorkspaces, session]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void apiFetch("/feed/public?limit=6")
+      .then((response) => readResponse<PublicFeedPost[]>(response))
+      .then((data) => {
+        if (!cancelled) {
+          setFeedPosts(data);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setFeedError(
+            error instanceof Error ? error.message : "Failed to load feed.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsFeedLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!session || pendingCreationStarted.current) {
@@ -321,6 +370,56 @@ export default function HomePage() {
             </button>
           </form>
         </div>
+      </section>
+
+      <section className={styles.feedSection}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.eyebrow}>Public feed</p>
+            <h2>Published workspace posts</h2>
+          </div>
+        </div>
+
+        {isFeedLoading ? (
+          <div className={styles.loadingGrid} aria-label="Loading public feed">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className={styles.skeleton} />
+            ))}
+          </div>
+        ) : feedError ? (
+          <p className={styles.error} role="alert">
+            {feedError}
+          </p>
+        ) : feedPosts.length === 0 ? (
+          <div className={styles.emptyState}>
+            <span aria-hidden="true">◇</span>
+            <h3>No public posts yet</h3>
+            <p>Published posts marked public will appear here.</p>
+          </div>
+        ) : (
+          <div className={styles.feedGrid}>
+            {feedPosts.map((post) => (
+              <article key={post.id} className={styles.feedCard}>
+                <div>
+                  <div className={styles.feedMeta}>
+                    <span>{post.workspace_name}</span>
+                    <time dateTime={post.published_at ?? post.created_at}>
+                      {formatDate(post.published_at ?? post.created_at)}
+                    </time>
+                  </div>
+                  <h3>{post.title}</h3>
+                  <p>
+                    {post.excerpt ||
+                      post.markdown_content.slice(0, 220)}
+                  </p>
+                </div>
+                <Link href={`/workspaces/${post.workspace_id}`}>
+                  Open workspace
+                </Link>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       {session && <section className={styles.workspaceSection}>

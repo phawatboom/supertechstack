@@ -6,7 +6,7 @@ from app.config import Settings, get_settings
 from app.db.database import get_database_session
 from app.models.workspace import Workspace
 from app.rate_limit import enforce_rate_limit
-from app.schemas.workspace import WorkspaceCreate, WorkspaceResponse
+from app.schemas.workspace import WorkspaceCreate, WorkspaceResponse, WorkspaceUpdate
 from app.security import Principal, get_owned_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -112,6 +112,25 @@ def get_workspace(
     database_session: Session = Depends(get_database_session),
 ):
     return get_owned_workspace(workspace_id, principal, database_session)
+
+
+@router.patch("/{workspace_id}", response_model=WorkspaceResponse)
+def update_workspace(
+    workspace_id: int,
+    workspace_input: WorkspaceUpdate,
+    principal: Principal = Depends(enforce_rate_limit),
+    database_session: Session = Depends(get_database_session),
+):
+    workspace = get_owned_workspace(workspace_id, principal, database_session)
+    changes = workspace_input.model_dump(exclude_unset=True)
+
+    for field, value in changes.items():
+        setattr(workspace, field, value)
+
+    database_session.commit()
+    database_session.refresh(workspace)
+
+    return workspace
 
 @router.delete("/{workspace_id}")
 def delete_workspace(

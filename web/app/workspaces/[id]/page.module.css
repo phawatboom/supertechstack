@@ -136,6 +136,87 @@
   line-height: 1.7;
 }
 
+.workspaceEditForm {
+  display: grid;
+  width: min(680px, 100%);
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 16px 40px rgba(30, 41, 59, 0.08);
+}
+
+.workspaceEditForm label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.workspaceEditForm input,
+.workspaceEditForm textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d9deea;
+  border-radius: 11px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.88);
+  color: #172033;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.workspaceEditForm input {
+  min-height: 43px;
+  padding: 0 13px;
+}
+
+.workspaceEditForm textarea {
+  min-height: 78px;
+  padding: 11px 13px;
+  resize: vertical;
+}
+
+.workspaceEditForm input:focus,
+.workspaceEditForm textarea:focus {
+  border-color: #7770e8;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.inlineActions button {
+  min-height: 40px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #4f46e5;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.inlineActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.inlineActions .secondaryButton {
+  border: 1px solid #dfe3ec;
+  background: #fff;
+  color: #475569;
+}
+
 .stats {
   display: flex;
   flex: 0 0 auto;
@@ -695,9 +776,53 @@
 }
 
 .sourceItem h3 {
-  margin: 8px 0 6px;
+  margin: 10px 0 7px;
   color: #273249;
   font-size: 14px;
+  line-height: 1.35;
+}
+
+.sourceEditForm {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.sourceEditForm label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sourceEditForm input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid #d8deea;
+  border-radius: 10px;
+  outline: none;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.sourceEditForm input:focus {
+  border-color: #7770e8;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.inlineError {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .sourceDetails {
@@ -725,19 +850,44 @@
   line-height: 1.65;
 }
 
-.viewButton {
+.viewButton,
+.renameButton,
+.deleteButton,
+.primaryTextButton,
+.secondaryTextButton,
+.dangerTextButton {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  margin-top: 10px;
+  min-height: 30px;
+  margin-top: 12px;
   padding: 0;
   border: 0;
   cursor: pointer;
   background: transparent;
-  color: #4f46e5;
   font: inherit;
   font-size: 11px;
   font-weight: 750;
+}
+
+.viewButton,
+.primaryTextButton {
+  color: #4f46e5;
+}
+
+.renameButton,
+.secondaryTextButton {
+  color: #475569;
+}
+
+.deleteButton,
+.dangerTextButton {
+  color: #b91c1c;
+}
+
+.renameButton,
+.deleteButton {
+  margin-left: 14px;
 }
 
 .viewButton span {
@@ -746,6 +896,82 @@
 
 .viewButton:hover span {
   transform: translateX(3px);
+}
+
+.viewButton:disabled,
+.renameButton:disabled,
+.deleteButton:disabled,
+.primaryTextButton:disabled,
+.secondaryTextButton:disabled,
+.dangerTextButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.sourceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.sourceActions .renameButton,
+.sourceActions .deleteButton,
+.sourceActions .primaryTextButton,
+.sourceActions .secondaryTextButton,
+.sourceActions .dangerTextButton {
+  margin-left: 0;
+}
+
+.deleteConfirmCard {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  background: #fff7f7;
+}
+
+.deleteConfirmCard h4 {
+  margin: 0 0 5px;
+  color: #7f1d1d;
+  font-size: 13px;
+}
+
+.deleteConfirmCard p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.deleteConfirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.deleteConfirmButton {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #dc2626;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.deleteConfirmButton:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.deleteConfirmButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .chunkList {

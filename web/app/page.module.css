@@ -10,6 +10,7 @@
 
 .header,
 .hero,
+.feedSection,
 .workspaceSection {
   width: min(1180px, 100%);
   margin-inline: auto;
@@ -352,6 +353,10 @@
   margin-top: clamp(72px, 10vw, 120px);
 }
 
+.feedSection {
+  margin-top: clamp(72px, 9vw, 104px);
+}
+
 .sectionHeader {
   align-items: flex-end;
   margin-bottom: 24px;
@@ -368,13 +373,15 @@
 }
 
 .workspaceGrid,
+.feedGrid,
 .loadingGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 
-.workspaceCard {
+.workspaceCard,
+.feedCard {
   display: flex;
   min-height: 230px;
   box-sizing: border-box;
@@ -390,10 +397,22 @@
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
-.workspaceCard:hover {
+.workspaceCard:hover,
+.feedCard:hover {
   transform: translateY(-4px);
   border-color: #c7d2fe;
   box-shadow: 0 20px 42px rgba(30, 41, 59, 0.1);
+}
+
+.feedMeta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
 }
 
 .workspaceMark {
@@ -437,14 +456,16 @@
   color: #4f46e5;
 }
 
-.workspaceCard h3 {
+.workspaceCard h3,
+.feedCard h3 {
   margin: 22px 0 8px;
   color: #1e293b;
   font-size: 18px;
   letter-spacing: -0.02em;
 }
 
-.workspaceCard p {
+.workspaceCard p,
+.feedCard p {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
@@ -453,6 +474,16 @@
   line-height: 1.65;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+}
+
+.feedCard a {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 24px;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .workspaceMeta {
@@ -531,6 +562,7 @@
   }
 
   .workspaceGrid,
+  .feedGrid,
   .loadingGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -576,6 +608,7 @@
   }
 
   .workspaceGrid,
+  .feedGrid,
   .loadingGrid {
     grid-template-columns: 1fr;
   }

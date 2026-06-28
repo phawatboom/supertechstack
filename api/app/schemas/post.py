@@ -65,3 +65,7 @@ class PostResponse(BaseModel):
     published_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class PublicFeedPostResponse(PostResponse):
+    workspace_name: str

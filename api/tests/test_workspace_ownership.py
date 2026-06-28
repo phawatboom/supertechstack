@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.db.database import Base
 from app.models.workspace import Workspace
-from app.routes.workspaces import create_workspace
-from app.schemas.workspace import WorkspaceCreate
+from app.routes.workspaces import create_workspace, update_workspace
+from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
 from app.security import Principal, get_owned_workspace
 
 
@@ -93,3 +93,39 @@ def test_creation_key_is_scoped_to_owner(database_session: Session):
 
     assert first.id != second.id
     assert database_session.query(Workspace).count() == 2
+
+
+def test_owner_can_rename_workspace(database_session: Session):
+    workspace = Workspace(
+        owner_id="user-a",
+        name="Old name",
+        description="Old description",
+    )
+    database_session.add(workspace)
+    database_session.commit()
+
+    updated = update_workspace(
+        workspace.id,
+        WorkspaceUpdate(name="New name", description="New description"),
+        Principal(owner_id="user-a", rate_limit_key="owner:user-a"),
+        database_session,
+    )
+
+    assert updated.name == "New name"
+    assert updated.description == "New description"
+
+
+def test_other_user_cannot_rename_workspace(database_session: Session):
+    workspace = Workspace(owner_id="user-a", name="Private workspace")
+    database_session.add(workspace)
+    database_session.commit()
+
+    with pytest.raises(HTTPException) as error:
+        update_workspace(
+            workspace.id,
+            WorkspaceUpdate(name="New name"),
+            Principal(owner_id="user-b", rate_limit_key="owner:user-b"),
+            database_session,
+        )
+
+    assert error.value.status_code == 404

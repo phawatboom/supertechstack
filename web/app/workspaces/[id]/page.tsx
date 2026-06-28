@@ -17,6 +17,7 @@ type Workspace = {
   id: number;
   name: string;
   description: string | null;
+  updated_at: string;
 };
 
 type Source = {
@@ -25,6 +26,8 @@ type Source = {
   title: string;
   source_type: string;
   raw_text: string;
+  markdown_content: string;
+  plain_text: string;
   original_filename: string | null;
   mime_type: string | null;
   file_size: number | null;
@@ -179,6 +182,11 @@ export default function WorkspaceDetailPage() {
   const demoMode = searchParams.get("demo") === "1";
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceDescription, setWorkspaceDescription] = useState("");
+  const [isEditingWorkspace, setIsEditingWorkspace] = useState(false);
+  const [isUpdatingWorkspace, setIsUpdatingWorkspace] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [sourceTitle, setSourceTitle] = useState("");
@@ -186,6 +194,14 @@ export default function WorkspaceDetailPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceError, setSourceError] = useState("");
+  const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
+  const [sourceEditTitle, setSourceEditTitle] = useState("");
+  const [savingSourceId, setSavingSourceId] = useState<number | null>(null);
+  const [sourceEditError, setSourceEditError] = useState("");
+  const [pendingDeleteSourceId, setPendingDeleteSourceId] = useState<
+    number | null
+  >(null);
+  const [deletingSourceId, setDeletingSourceId] = useState<number | null>(null);
   const [uploadTitle, setUploadTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -283,6 +299,8 @@ export default function WorkspaceDetailPage() {
         }) => {
         if (!cancelled) {
           setWorkspace(workspaceData);
+          setWorkspaceName(workspaceData.name);
+          setWorkspaceDescription(workspaceData.description ?? "");
           setSources(sourcesData);
           setChunks(chunksData);
           setAnswerTraces(tracesData);
@@ -350,6 +368,170 @@ export default function WorkspaceDetailPage() {
     setRetrievalLimit(answerDefaults.retrieval_limit);
     setMaxOutputTokens(answerDefaults.max_output_tokens ?? "");
     setSaveAnswerReport(answerDefaults.save_report);
+  }
+
+  function startWorkspaceEdit() {
+    setWorkspaceName(workspace?.name ?? "");
+    setWorkspaceDescription(workspace?.description ?? "");
+    setWorkspaceError("");
+    setIsEditingWorkspace(true);
+  }
+
+  function cancelWorkspaceEdit() {
+    setWorkspaceName(workspace?.name ?? "");
+    setWorkspaceDescription(workspace?.description ?? "");
+    setWorkspaceError("");
+    setIsEditingWorkspace(false);
+  }
+
+  async function updateWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = workspaceName.trim();
+    const description = workspaceDescription.trim();
+
+    if (!name) {
+      setWorkspaceError("Enter a workspace name.");
+      return;
+    }
+
+    setIsUpdatingWorkspace(true);
+    setWorkspaceError("");
+
+    try {
+      const response = await apiFetch(`/workspaces/${workspaceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          description: description || null,
+        }),
+      });
+      const updatedWorkspace = await readResponse<Workspace>(response);
+
+      setWorkspace(updatedWorkspace);
+      setWorkspaceName(updatedWorkspace.name);
+      setWorkspaceDescription(updatedWorkspace.description ?? "");
+      setIsEditingWorkspace(false);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to update workspace.",
+      );
+    } finally {
+      setIsUpdatingWorkspace(false);
+    }
+  }
+
+  function startSourceEdit(source: Source) {
+    setEditingSourceId(source.id);
+    setSourceEditTitle(source.title);
+    setSourceEditError("");
+    setPendingDeleteSourceId(null);
+  }
+
+  function cancelSourceEdit() {
+    setEditingSourceId(null);
+    setSourceEditTitle("");
+    setSourceEditError("");
+  }
+
+  async function updateSourceTitle(source: Source) {
+    const title = sourceEditTitle.trim();
+
+    if (!title) {
+      setSourceEditError("Enter a source name.");
+      return;
+    }
+
+    setSavingSourceId(source.id);
+    setSourceEditError("");
+
+    try {
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/sources/${source.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        },
+      );
+      const updatedSource = await readResponse<Source>(response);
+
+      setSources((current) =>
+        current.map((item) =>
+          item.id === updatedSource.id ? updatedSource : item,
+        ),
+      );
+      setSearchResults((current) =>
+        current.map((result) =>
+          result.source_id === updatedSource.id
+            ? { ...result, source_title: updatedSource.title }
+            : result,
+        ),
+      );
+
+      if (detailView?.kind === "source" && detailView.item.id === source.id) {
+        setDetailView({ kind: "source", item: updatedSource });
+      }
+
+      setEditingSourceId(null);
+      setSourceEditTitle("");
+    } catch (error) {
+      setSourceEditError(
+        error instanceof Error ? error.message : "Failed to rename source.",
+      );
+    } finally {
+      setSavingSourceId(null);
+    }
+  }
+
+  function requestDeleteSource(source: Source) {
+    setPendingDeleteSourceId(source.id);
+    setEditingSourceId(null);
+    setSourceEditError("");
+    setSourceError("");
+  }
+
+  async function deleteSource(source: Source) {
+    if (pendingDeleteSourceId !== source.id) {
+      requestDeleteSource(source);
+      return;
+    }
+
+    setDeletingSourceId(source.id);
+    setSourceError("");
+
+    try {
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/sources/${source.id}`,
+        { method: "DELETE" },
+      );
+      await readResponse<{
+        message: string;
+        source_id: number;
+        deleted_chunks: number;
+      }>(response);
+
+      setSources((current) => current.filter((item) => item.id !== source.id));
+      setChunks((current) =>
+        current.filter((chunk) => chunk.source_id !== source.id),
+      );
+      setSearchResults((current) =>
+        current.filter((result) => result.source_id !== source.id),
+      );
+
+      if (detailView?.kind === "source" && detailView.item.id === source.id) {
+        setDetailView(null);
+      }
+
+      setPendingDeleteSourceId(null);
+    } catch (error) {
+      setSourceError(
+        error instanceof Error ? error.message : "Failed to delete source.",
+      );
+    } finally {
+      setDeletingSourceId(null);
+    }
   }
 
   async function refreshAnswerTraces() {
@@ -602,12 +784,71 @@ export default function WorkspaceDetailPage() {
 
       <header className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>Research workspace</p>
-          <h1>{workspace?.name ?? `Workspace ${workspaceId}`}</h1>
-          <p className={styles.description}>
-            {workspace?.description ||
-              "Add source material, inspect retrieved chunks, and ask grounded questions."}
-          </p>
+          {isEditingWorkspace ? (
+            <form
+              onSubmit={updateWorkspace}
+              className={styles.workspaceEditForm}
+            >
+              <p className={styles.eyebrow}>Edit workspace</p>
+              <label>
+                Name
+                <input
+                  value={workspaceName}
+                  onChange={(event) => setWorkspaceName(event.target.value)}
+                  disabled={isUpdatingWorkspace}
+                  maxLength={255}
+                />
+              </label>
+              <label>
+                Description
+                <textarea
+                  value={workspaceDescription}
+                  onChange={(event) =>
+                    setWorkspaceDescription(event.target.value)
+                  }
+                  disabled={isUpdatingWorkspace}
+                  rows={3}
+                  maxLength={1000}
+                />
+              </label>
+              {workspaceError && (
+                <p className={styles.error} role="alert">
+                  {workspaceError}
+                </p>
+              )}
+              <div className={styles.inlineActions}>
+                <button type="submit" disabled={isUpdatingWorkspace}>
+                  {isUpdatingWorkspace ? "Saving..." : "Save changes"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={cancelWorkspaceEdit}
+                  disabled={isUpdatingWorkspace}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <p className={styles.eyebrow}>Research workspace</p>
+              <h1>{workspace?.name ?? `Workspace ${workspaceId}`}</h1>
+              <p className={styles.description}>
+                {workspace?.description ||
+                  "Add source material, inspect retrieved chunks, and ask grounded questions."}
+              </p>
+              {!demoMode && (
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={startWorkspaceEdit}
+                >
+                  Edit workspace
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         <div className={styles.stats}>
@@ -1230,6 +1471,12 @@ export default function WorkspaceDetailPage() {
               <span className={styles.count}>{sources.length}</span>
             </div>
 
+            {sourceError && (
+              <p className={styles.error} role="alert">
+                {sourceError}
+              </p>
+            )}
+
             {sources.length === 0 ? (
               <div className={styles.emptyState}>
                 <span aria-hidden="true">＋</span>
@@ -1246,7 +1493,53 @@ export default function WorkspaceDetailPage() {
                         {formatDate(source.created_at)}
                       </time>
                     </div>
-                    <h3>{source.title}</h3>
+                    {editingSourceId === source.id ? (
+                      <form
+                        className={styles.sourceEditForm}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void updateSourceTitle(source);
+                        }}
+                      >
+                        <label>
+                          Source name
+                          <input
+                            value={sourceEditTitle}
+                            onChange={(event) =>
+                              setSourceEditTitle(event.target.value)
+                            }
+                            disabled={savingSourceId === source.id}
+                            maxLength={255}
+                          />
+                        </label>
+                        {sourceEditError && (
+                          <p className={styles.inlineError} role="alert">
+                            {sourceEditError}
+                          </p>
+                        )}
+                        <div className={styles.sourceActions}>
+                          <button
+                            type="submit"
+                            className={styles.primaryTextButton}
+                            disabled={savingSourceId === source.id}
+                          >
+                            {savingSourceId === source.id
+                              ? "Saving..."
+                              : "Save name"}
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.secondaryTextButton}
+                            onClick={cancelSourceEdit}
+                            disabled={savingSourceId === source.id}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <h3>{source.title}</h3>
+                    )}
                     {source.original_filename && (
                       <div className={styles.sourceDetails}>
                         <span>{source.original_filename}</span>
@@ -1269,6 +1562,65 @@ export default function WorkspaceDetailPage() {
                       View full source
                       <span aria-hidden="true">→</span>
                     </button>
+                    {!demoMode && (
+                      <button
+                        type="button"
+                        className={styles.renameButton}
+                        onClick={() => startSourceEdit(source)}
+                        disabled={editingSourceId === source.id}
+                      >
+                        Rename
+                      </button>
+                    )}
+                    {!demoMode && (
+                      <button
+                        type="button"
+                        className={styles.deleteButton}
+                        onClick={() => requestDeleteSource(source)}
+                        disabled={deletingSourceId === source.id}
+                      >
+                        {deletingSourceId === source.id
+                          ? "Deleting..."
+                          : "Delete source"}
+                      </button>
+                    )}
+                    {pendingDeleteSourceId === source.id && (
+                      <div
+                        className={styles.deleteConfirmCard}
+                        role="alertdialog"
+                        aria-labelledby={`delete-source-${source.id}`}
+                      >
+                        <div>
+                          <h4 id={`delete-source-${source.id}`}>
+                            Delete this source?
+                          </h4>
+                          <p>
+                            This removes the source and its indexed chunks from
+                            search. Draft posts linked to it will remain.
+                          </p>
+                        </div>
+                        <div className={styles.deleteConfirmActions}>
+                          <button
+                            type="button"
+                            className={styles.deleteConfirmButton}
+                            onClick={() => void deleteSource(source)}
+                            disabled={deletingSourceId === source.id}
+                          >
+                            {deletingSourceId === source.id
+                              ? "Deleting..."
+                              : "Delete source"}
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.secondaryTextButton}
+                            onClick={() => setPendingDeleteSourceId(null)}
+                            disabled={deletingSourceId === source.id}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>

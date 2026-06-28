@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_database_session
 from app.models.post import Post
 from app.models.source import Source
+from app.models.workspace import Workspace
 from app.rate_limit import enforce_rate_limit
 from app.schemas.post import (
     CreatePostFromSourceRequest,
+    PublicFeedPostResponse,
     PostResponse,
     PostUpdate,
 )
@@ -36,6 +40,36 @@ def _get_workspace_post(
         raise HTTPException(status_code=404, detail="Post not found")
 
     return post
+
+
+@router.get(
+    "/feed/public",
+    response_model=list[PublicFeedPostResponse],
+)
+def list_public_feed_posts(
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    database_session: Session = Depends(get_database_session),
+):
+    rows = (
+        database_session.query(Post, Workspace.name)
+        .join(Workspace, Workspace.id == Post.workspace_id)
+        .filter(Post.status == "published", Post.visibility == "public")
+        .order_by(Post.published_at.desc(), Post.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        PublicFeedPostResponse.model_validate(
+            {
+                **post.__dict__,
+                "workspace_name": workspace_name,
+            }
+        )
+        for post, workspace_name in rows
+    ]
 
 
 @router.post(

@@ -8,8 +8,15 @@ from app.models.chunk import Chunk
 from app.models.post import Post
 from app.models.source import Source
 from app.models.workspace import Workspace
-from app.routes.posts import create_source_post, list_posts, update_post
+from app.routes.posts import (
+    create_source_post,
+    list_posts,
+    list_public_feed_posts,
+    update_post,
+)
+from app.routes.sources import delete_source, update_source
 from app.schemas.post import CreatePostFromSourceRequest, PostUpdate
+from app.schemas.source import SourceUpdate
 from app.security import Principal
 from app.services.content_representations import markdown_to_plain_text
 from app.services.file_extraction import extract_text_from_file
@@ -235,6 +242,145 @@ def test_publish_post_sets_published_at_and_list_is_owner_scoped(
 
     assert error.value.status_code == 404
     assert database_session.query(Post).count() == 1
+
+
+def test_public_feed_only_lists_public_published_posts(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session)
+    other_workspace = create_workspace(database_session, owner_id="user-b")
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Public market update",
+        raw_text="Original notes",
+        source_type="pasted_text",
+    )
+    other_source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=other_workspace.id,
+        title="Private market update",
+        raw_text="Other notes",
+        source_type="pasted_text",
+    )
+    public_post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        post_input=None,
+        principal=principal(),
+        database_session=database_session,
+    )
+    private_post = create_source_post(
+        workspace_id=other_workspace.id,
+        source_id=other_source.id,
+        post_input=None,
+        principal=principal("user-b"),
+        database_session=database_session,
+    )
+
+    update_post(
+        workspace_id=workspace.id,
+        post_id=public_post.id,
+        post_input=PostUpdate(status="published", visibility="public"),
+        principal=principal(),
+        database_session=database_session,
+    )
+    update_post(
+        workspace_id=other_workspace.id,
+        post_id=private_post.id,
+        post_input=PostUpdate(status="published", visibility="private"),
+        principal=principal("user-b"),
+        database_session=database_session,
+    )
+
+    feed_posts = list_public_feed_posts(database_session=database_session)
+
+    assert [post.id for post in feed_posts] == [public_post.id]
+    assert feed_posts[0].workspace_name == "Publishing workspace"
+
+
+def test_delete_source_removes_chunks_and_unlinks_posts(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session)
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Delete me",
+        raw_text="Original notes",
+        source_type="pasted_text",
+    )
+    post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        post_input=None,
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    result = delete_source(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        principal=principal(),
+        database_session=database_session,
+    )
+    database_session.refresh(post)
+
+    assert result["deleted_chunks"] == 1
+    assert database_session.get(Source, source.id) is None
+    assert database_session.query(Chunk).filter(Chunk.source_id == source.id).count() == 0
+    assert post.source_id is None
+
+
+def test_owner_can_rename_source(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session)
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Draft name",
+        raw_text="Original notes",
+        source_type="pasted_text",
+    )
+
+    updated = update_source(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        source_input=SourceUpdate(title="Final source name"),
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    assert updated.title == "Final source name"
+
+
+def test_other_user_cannot_rename_source(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session, owner_id="user-a")
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Private notes",
+        raw_text="Original notes",
+        source_type="pasted_text",
+    )
+
+    with pytest.raises(HTTPException) as error:
+        update_source(
+            workspace_id=workspace.id,
+            source_id=source.id,
+            source_input=SourceUpdate(title="Other title"),
+            principal=principal("user-b"),
+            database_session=database_session,
+        )
+
+    assert error.value.status_code == 404
 
 
 def test_other_user_cannot_create_post_from_source(
