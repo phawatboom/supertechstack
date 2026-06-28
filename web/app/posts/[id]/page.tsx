@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { apiFetch } from "../../lib/api";
 import styles from "./page.module.css";
 
@@ -45,73 +47,9 @@ function formatDate(value: string) {
 }
 
 function MarkdownContent({ markdown }: { markdown: string }) {
-  const blocks: Array<{ kind: "h2" | "h3" | "li" | "p"; text: string }> = [];
-  let paragraph: string[] = [];
-
-  function flushParagraph() {
-    const text = paragraph.join(" ").trim();
-
-    if (text) {
-      blocks.push({ kind: "p", text });
-    }
-
-    paragraph = [];
-  }
-
-  for (const rawLine of markdown.split(/\r?\n/)) {
-    const line = rawLine.trim();
-
-    if (!line) {
-      flushParagraph();
-      continue;
-    }
-
-    if (line.startsWith("## ")) {
-      flushParagraph();
-      blocks.push({ kind: "h2", text: line.slice(3).trim() });
-      continue;
-    }
-
-    if (line.startsWith("# ")) {
-      flushParagraph();
-      blocks.push({ kind: "h2", text: line.slice(2).trim() });
-      continue;
-    }
-
-    if (line.startsWith("### ")) {
-      flushParagraph();
-      blocks.push({ kind: "h3", text: line.slice(4).trim() });
-      continue;
-    }
-
-    if (line.startsWith("- ")) {
-      flushParagraph();
-      blocks.push({ kind: "li", text: line.slice(2).trim() });
-      continue;
-    }
-
-    paragraph.push(line);
-  }
-
-  flushParagraph();
-
   return (
     <div className={styles.postBody}>
-      {blocks.map((block, index) => {
-        if (block.kind === "h2") {
-          return <h2 key={index}>{block.text}</h2>;
-        }
-
-        if (block.kind === "h3") {
-          return <h3 key={index}>{block.text}</h3>;
-        }
-
-        if (block.kind === "li") {
-          return <p key={index} className={styles.listItem}>{block.text}</p>;
-        }
-
-        return <p key={index}>{block.text}</p>;
-      })}
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
     </div>
   );
 }

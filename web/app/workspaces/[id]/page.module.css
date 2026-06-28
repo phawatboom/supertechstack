@@ -466,8 +466,6 @@
 }
 
 .previewBody {
-  display: grid;
-  gap: 9px;
   max-height: 420px;
   overflow: auto;
   color: #334155;
@@ -475,20 +473,101 @@
   line-height: 1.65;
 }
 
+.previewBody > * + * {
+  margin-top: 10px;
+}
+
+.previewBody h1,
+.previewBody h2,
+.previewBody h3,
 .previewBody h4,
 .previewBody h5,
-.previewBody p {
+.previewBody p,
+.previewBody ul,
+.previewBody ol,
+.previewBody blockquote,
+.previewBody pre,
+.previewBody table {
   margin: 0;
 }
 
+.previewBody h1,
+.previewBody h2,
+.previewBody h3,
 .previewBody h4 {
   color: #172033;
   font-size: 16px;
+  line-height: 1.35;
 }
 
 .previewBody h5 {
   color: #273249;
   font-size: 14px;
+}
+
+.previewBody ul,
+.previewBody ol {
+  padding-left: 18px;
+}
+
+.previewBody a {
+  color: #4f46e5;
+}
+
+.previewBody code {
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-family: var(--font-geist-mono), Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.previewBody pre {
+  overflow-x: auto;
+  padding: 10px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.previewBody pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.previewBody blockquote {
+  padding: 8px 10px;
+  border-left: 3px solid #a5b4fc;
+  background: #f8fafc;
+}
+
+.previewBody table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.previewBody th,
+.previewBody td {
+  padding: 7px 8px;
+  border: 1px solid #dfe3ec;
+  text-align: left;
+  vertical-align: top;
+}
+
+.previewBody th {
+  background: #f8fafc;
+  color: #172033;
+}
+
+.previewBody img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
 }
 
 .loadingCard {

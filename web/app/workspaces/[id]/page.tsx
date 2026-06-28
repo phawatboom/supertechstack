@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import styles from "./page.module.css";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../components/auth-provider";
@@ -914,7 +916,7 @@ export default function WorkspaceDetailPage() {
   }
 
   const activePostSource = sourceForPost(activePost);
-  const previewLines = postMarkdown.trim().split("\n").filter(Boolean);
+  const previewMarkdown = postMarkdown.trim();
 
   return (
     <main className={styles.shell}>
@@ -1175,24 +1177,12 @@ export default function WorkspaceDetailPage() {
                       </p>
                     )}
                     <div className={styles.previewBody}>
-                      {previewLines.length === 0 ? (
+                      {previewMarkdown.length === 0 ? (
                         <p>Write Markdown content to preview the post.</p>
                       ) : (
-                        previewLines.slice(0, 16).map((line, index) => {
-                          if (line.startsWith("# ")) {
-                            return <h4 key={index}>{line.slice(2)}</h4>;
-                          }
-
-                          if (line.startsWith("## ")) {
-                            return <h5 key={index}>{line.slice(3)}</h5>;
-                          }
-
-                          if (line.startsWith("- ")) {
-                            return <p key={index}>• {line.slice(2)}</p>;
-                          }
-
-                          return <p key={index}>{line}</p>;
-                        })
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {previewMarkdown}
+                        </ReactMarkdown>
                       )}
                     </div>
                   </article>
