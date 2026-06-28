@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
+from app.config import get_settings
 from app.schemas.news import NewsSearchResult, canonicalize_news_url
 
 
@@ -34,6 +35,23 @@ class RawNewsSearchResult:
     publisher: str | None = None
     published_at: datetime | None = None
     external_id: str | None = None
+
+
+def discover_news_results(
+    query: str,
+    *,
+    max_results: int,
+    provider: NewsSearchProvider,
+) -> list[NewsSearchResult]:
+    query = query.strip()
+
+    if not query:
+        raise ValueError("query cannot be blank")
+
+    if max_results < 1:
+        raise ValueError("max_results must be at least 1")
+
+    return provider.search(query, max_results=max_results)
 
 
 def normalize_news_search_results(
@@ -74,6 +92,18 @@ def normalize_news_search_results(
     return normalized_results
 
 
+class DisabledNewsSearchProvider:
+    provider_name = "disabled"
+
+    def search(
+        self,
+        query: str,
+        *,
+        max_results: int,
+    ) -> list[NewsSearchResult]:
+        raise NewsSearchProviderError("News search provider is not configured")
+
+
 class StaticNewsSearchProvider:
     provider_name = "static"
 
@@ -96,3 +126,12 @@ class StaticNewsSearchProvider:
             self._results,
             max_results=max_results,
         )
+
+
+def get_news_search_provider() -> NewsSearchProvider:
+    settings = get_settings()
+
+    if settings.news_search_provider == "static":
+        return StaticNewsSearchProvider([])
+
+    return DisabledNewsSearchProvider()

@@ -77,6 +77,8 @@ class Settings:
     rate_limit_window_seconds: int
     observability_enabled: bool
     observability_capture_content: bool
+    news_search_provider: str
+    news_search_timeout_seconds: int
 
     @property
     def is_production(self) -> bool:
@@ -143,6 +145,16 @@ def get_settings() -> Settings:
             "DEFAULT_MAX_OUTPUT_TOKENS cannot exceed MAX_OUTPUT_TOKENS"
         )
 
+    news_search_provider = os.getenv(
+        "NEWS_SEARCH_PROVIDER",
+        "disabled",
+    ).strip().lower()
+
+    if news_search_provider not in {"disabled", "static"}:
+        raise RuntimeError(
+            "NEWS_SEARCH_PROVIDER must be 'disabled' or 'static'"
+        )
+
     return Settings(
         environment=environment,
         database_url=database_url,
@@ -201,5 +213,10 @@ def get_settings() -> Settings:
         observability_capture_content=_boolean(
             "OBSERVABILITY_CAPTURE_CONTENT",
             environment != "production",
+        ),
+        news_search_provider=news_search_provider,
+        news_search_timeout_seconds=_integer(
+            "NEWS_SEARCH_TIMEOUT_SECONDS",
+            10,
         ),
     )

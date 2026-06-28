@@ -5,8 +5,10 @@ from pydantic import ValidationError
 
 from app.schemas.news import NewsSearchResult, canonicalize_news_url
 from app.services.news_search import (
+    DisabledNewsSearchProvider,
     RawNewsSearchResult,
     StaticNewsSearchProvider,
+    discover_news_results,
     normalize_news_search_results,
 )
 
@@ -103,3 +105,24 @@ def test_static_provider_rejects_blank_query():
 
     with pytest.raises(ValueError):
         provider.search("   ", max_results=5)
+
+
+def test_discover_news_results_uses_provider_contract():
+    provider = StaticNewsSearchProvider(
+        [RawNewsSearchResult(title="One", url="https://example.com/one")]
+    )
+
+    results = discover_news_results(
+        "  market regulation  ",
+        max_results=5,
+        provider=provider,
+    )
+
+    assert [result.title for result in results] == ["One"]
+
+
+def test_disabled_provider_fails_explicitly():
+    provider = DisabledNewsSearchProvider()
+
+    with pytest.raises(RuntimeError, match="not configured"):
+        provider.search("market regulation", max_results=5)

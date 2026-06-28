@@ -77,6 +77,29 @@ class NewsSearchResult(BaseModel):
         return canonicalize_news_url(value)
 
 
+class NewsDiscoveryRequest(BaseModel):
+    query: str | None = Field(default=None, min_length=3, max_length=2_000)
+    max_results: int | None = Field(default=None, ge=1, le=50)
+
+    @field_validator("query")
+    @classmethod
+    def strip_optional_query(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Value cannot be blank")
+
+        return value
+
+
+class NewsDiscoveryResponse(BaseModel):
+    query: str
+    results: list[NewsSearchResult]
+
+
 class NewsSearchConfigCreate(BaseModel):
     query: str = Field(min_length=3, max_length=2_000)
     is_enabled: bool = False

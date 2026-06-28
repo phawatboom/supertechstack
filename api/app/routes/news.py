@@ -6,12 +6,20 @@ from app.db.database import get_database_session
 from app.models.news import NewsRun, NewsSearchConfig
 from app.rate_limit import enforce_rate_limit
 from app.schemas.news import (
+    NewsDiscoveryRequest,
+    NewsDiscoveryResponse,
     NewsRunResponse,
     NewsSearchConfigCreate,
     NewsSearchConfigResponse,
     NewsSearchConfigUpdate,
 )
 from app.security import Principal, get_owned_workspace
+from app.services.news_search import (
+    NewsSearchProviderError,
+    NewsSearchProviderTimeout,
+    discover_news_results,
+    get_news_search_provider,
+)
 
 router = APIRouter(tags=["news"])
 
@@ -122,6 +130,47 @@ def update_news_config(
     database_session.refresh(config)
 
     return config
+
+
+@router.post(
+    "/workspaces/{workspace_id}/news/discover",
+    response_model=NewsDiscoveryResponse,
+)
+def discover_news(
+    workspace_id: int,
+    discovery_input: NewsDiscoveryRequest,
+    principal: Principal = Depends(enforce_rate_limit),
+    database_session: Session = Depends(get_database_session),
+    provider = Depends(get_news_search_provider),
+):
+    get_owned_workspace(workspace_id, principal, database_session)
+
+    query = discovery_input.query
+    max_results = discovery_input.max_results
+
+    if query is None or max_results is None:
+        config = _get_news_config(workspace_id, database_session)
+        query = query or config.query
+        max_results = max_results or config.max_results_per_run
+
+    try:
+        results = discover_news_results(
+            query,
+            max_results=max_results,
+            provider=provider,
+        )
+    except NewsSearchProviderTimeout as error:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="News search provider timed out",
+        ) from error
+    except NewsSearchProviderError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    return NewsDiscoveryResponse(query=query, results=results)
 
 
 @router.get(

@@ -8,15 +8,26 @@ from sqlalchemy.orm import Session
 
 from app.db.database import Base
 from app.models.news import NewsRun, NewsSearchConfig
+from app.models.source import Source
 from app.models.workspace import Workspace
 from app.routes.news import (
     create_news_config,
+    discover_news,
     get_news_config,
     list_news_runs,
     update_news_config,
 )
-from app.schemas.news import NewsSearchConfigCreate, NewsSearchConfigUpdate
+from app.schemas.news import (
+    NewsDiscoveryRequest,
+    NewsSearchConfigCreate,
+    NewsSearchConfigUpdate,
+)
 from app.security import Principal
+from app.services.news_search import (
+    DisabledNewsSearchProvider,
+    RawNewsSearchResult,
+    StaticNewsSearchProvider,
+)
 
 
 @pytest.fixture
@@ -225,3 +236,105 @@ def test_news_runs_are_scoped_to_workspace_owner(
         )
 
     assert error.value.status_code == 404
+
+
+def test_owner_can_discover_news_from_config_without_persisting_results(
+    database_session: Session,
+):
+    workspace = create_workspace(database_session)
+    create_news_config(
+        workspace_id=workspace.id,
+        config_input=NewsSearchConfigCreate(
+            query="AI infrastructure",
+            max_results_per_run=5,
+        ),
+        principal=principal(),
+        database_session=database_session,
+    )
+    provider = StaticNewsSearchProvider(
+        [
+            RawNewsSearchResult(
+                title="AI infrastructure update",
+                url="https://example.com/ai?utm_source=newsletter",
+                snippet="A recent AI infrastructure update.",
+                publisher="Example",
+            )
+        ]
+    )
+
+    response = discover_news(
+        workspace_id=workspace.id,
+        discovery_input=NewsDiscoveryRequest(),
+        principal=principal(),
+        database_session=database_session,
+        provider=provider,
+    )
+
+    assert response.query == "AI infrastructure"
+    assert len(response.results) == 1
+    assert response.results[0].canonical_url == "https://example.com/ai"
+    assert database_session.query(Source).count() == 0
+    assert database_session.query(NewsRun).count() == 0
+
+
+def test_discover_news_can_use_explicit_query_and_result_limit(
+    database_session: Session,
+):
+    workspace = create_workspace(database_session)
+    provider = StaticNewsSearchProvider(
+        [
+            RawNewsSearchResult(title="One", url="https://example.com/one"),
+            RawNewsSearchResult(title="Two", url="https://example.com/two"),
+        ]
+    )
+
+    response = discover_news(
+        workspace_id=workspace.id,
+        discovery_input=NewsDiscoveryRequest(
+            query="bank regulation",
+            max_results=1,
+        ),
+        principal=principal(),
+        database_session=database_session,
+        provider=provider,
+    )
+
+    assert response.query == "bank regulation"
+    assert [result.title for result in response.results] == ["One"]
+    assert database_session.query(Source).count() == 0
+    assert database_session.query(NewsRun).count() == 0
+
+
+def test_other_user_cannot_discover_news(
+    database_session: Session,
+):
+    workspace = create_workspace(database_session, owner_id="user-a")
+
+    with pytest.raises(HTTPException) as error:
+        discover_news(
+            workspace_id=workspace.id,
+            discovery_input=NewsDiscoveryRequest(query="private news"),
+            principal=principal("user-b"),
+            database_session=database_session,
+            provider=StaticNewsSearchProvider([]),
+        )
+
+    assert error.value.status_code == 404
+
+
+def test_discover_news_returns_service_unavailable_when_provider_disabled(
+    database_session: Session,
+):
+    workspace = create_workspace(database_session)
+
+    with pytest.raises(HTTPException) as error:
+        discover_news(
+            workspace_id=workspace.id,
+            discovery_input=NewsDiscoveryRequest(query="market regulation"),
+            principal=principal(),
+            database_session=database_session,
+            provider=DisabledNewsSearchProvider(),
+        )
+
+    assert error.value.status_code == 503
+    assert "not configured" in error.value.detail
