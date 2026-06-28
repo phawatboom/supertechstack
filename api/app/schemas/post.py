@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 PostStatus = Literal["draft", "published", "archived"]
-PostVisibility = Literal["private", "workspace", "public"]
+PostVisibility = Literal["private", "workspace", "unlisted", "public"]
 
 
 class CreatePostFromSourceRequest(BaseModel):

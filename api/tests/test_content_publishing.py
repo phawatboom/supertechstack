@@ -264,6 +264,13 @@ def test_public_feed_only_lists_public_published_posts(
         raw_text="Other notes",
         source_type="pasted_text",
     )
+    unlisted_source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Unlisted market update",
+        raw_text="Unlisted notes",
+        source_type="pasted_text",
+    )
     public_post = create_source_post(
         workspace_id=workspace.id,
         source_id=source.id,
@@ -276,6 +283,13 @@ def test_public_feed_only_lists_public_published_posts(
         source_id=other_source.id,
         post_input=None,
         principal=principal("user-b"),
+        database_session=database_session,
+    )
+    unlisted_post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=unlisted_source.id,
+        post_input=None,
+        principal=principal(),
         database_session=database_session,
     )
 
@@ -291,6 +305,13 @@ def test_public_feed_only_lists_public_published_posts(
         post_id=private_post.id,
         post_input=PostUpdate(status="published", visibility="private"),
         principal=principal("user-b"),
+        database_session=database_session,
+    )
+    update_post(
+        workspace_id=workspace.id,
+        post_id=unlisted_post.id,
+        post_input=PostUpdate(status="published", visibility="unlisted"),
+        principal=principal(),
         database_session=database_session,
     )
 

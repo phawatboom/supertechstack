@@ -35,6 +35,23 @@ type Source = {
   created_at: string;
 };
 
+type Post = {
+  id: number;
+  workspace_id: number;
+  source_id: number | null;
+  author_id: string;
+  title: string;
+  slug: string;
+  markdown_content: string;
+  excerpt: string | null;
+  cover_image_url: string | null;
+  visibility: "private" | "workspace" | "unlisted" | "public";
+  status: "draft" | "published" | "archived";
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type Chunk = {
   id: number;
   source_id: number;
@@ -188,6 +205,7 @@ export default function WorkspaceDetailPage() {
   const [isUpdatingWorkspace, setIsUpdatingWorkspace] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [sourceTitle, setSourceTitle] = useState("");
   const [rawText, setRawText] = useState("");
@@ -202,6 +220,15 @@ export default function WorkspaceDetailPage() {
     number | null
   >(null);
   const [deletingSourceId, setDeletingSourceId] = useState<number | null>(null);
+  const [activePost, setActivePost] = useState<Post | null>(null);
+  const [postTitle, setPostTitle] = useState("");
+  const [postExcerpt, setPostExcerpt] = useState("");
+  const [postMarkdown, setPostMarkdown] = useState("");
+  const [postVisibility, setPostVisibility] =
+    useState<Post["visibility"]>("private");
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
+  const [isSavingPost, setIsSavingPost] = useState(false);
+  const [postError, setPostError] = useState("");
   const [uploadTitle, setUploadTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -258,6 +285,7 @@ export default function WorkspaceDetailPage() {
         workspaceData,
         sourcesData,
         chunksData,
+        postsData: [] as Post[],
         tracesData: [] as AnswerTraceSummary[],
         defaultsData: {
           ...fallbackAnswerDefaults,
@@ -271,15 +299,18 @@ export default function WorkspaceDetailPage() {
       apiFetch(`/workspaces/${workspaceId}/answer-traces`),
       apiFetch("/answer-settings/defaults"),
     ]);
-    const [tracesData, defaultsData] = await Promise.all([
+    const [postsResponse, tracesData, defaultsData] = await Promise.all([
+      apiFetch(`/workspaces/${workspaceId}/posts`),
       readResponse<AnswerTraceSummary[]>(tracesResponse),
       readResponse<AnswerDefaults>(defaultsResponse),
     ]);
+    const postsData = await readResponse<Post[]>(postsResponse);
 
     return {
       workspaceData,
       sourcesData,
       chunksData,
+      postsData,
       tracesData,
       defaultsData,
     };
@@ -294,6 +325,7 @@ export default function WorkspaceDetailPage() {
           workspaceData,
           sourcesData,
           chunksData,
+          postsData,
           tracesData,
           defaultsData,
         }) => {
@@ -302,6 +334,7 @@ export default function WorkspaceDetailPage() {
           setWorkspaceName(workspaceData.name);
           setWorkspaceDescription(workspaceData.description ?? "");
           setSources(sourcesData);
+          setPosts(postsData);
           setChunks(chunksData);
           setAnswerTraces(tracesData);
           setAnswerDefaults(defaultsData);
@@ -359,6 +392,32 @@ export default function WorkspaceDetailPage() {
       sources.find((source) => source.id === chunk.source_id)?.title ??
       `Source ${chunk.source_id}`
     );
+  }
+
+  function postForSource(sourceId: number) {
+    return posts.find((post) => post.source_id === sourceId) ?? null;
+  }
+
+  function sourceForPost(post: Post | null) {
+    if (!post?.source_id) {
+      return null;
+    }
+
+    return sources.find((source) => source.id === post.source_id) ?? null;
+  }
+
+  function openPostEditor(post: Post) {
+    setActivePost(post);
+    setPostTitle(post.title);
+    setPostExcerpt(post.excerpt ?? "");
+    setPostMarkdown(post.markdown_content);
+    setPostVisibility(post.visibility);
+    setPostError("");
+  }
+
+  function closePostEditor() {
+    setActivePost(null);
+    setPostError("");
   }
 
   function resetAnswerSettings() {
@@ -519,6 +578,11 @@ export default function WorkspaceDetailPage() {
       setSearchResults((current) =>
         current.filter((result) => result.source_id !== source.id),
       );
+      setPosts((current) =>
+        current.map((post) =>
+          post.source_id === source.id ? { ...post, source_id: null } : post,
+        ),
+      );
 
       if (detailView?.kind === "source" && detailView.item.id === source.id) {
         setDetailView(null);
@@ -531,6 +595,93 @@ export default function WorkspaceDetailPage() {
       );
     } finally {
       setDeletingSourceId(null);
+    }
+  }
+
+  async function createOrOpenPostForSource(source: Source) {
+    const existingPost = postForSource(source.id);
+
+    if (existingPost) {
+      openPostEditor(existingPost);
+      return;
+    }
+
+    setIsCreatingPost(true);
+    setPostError("");
+
+    try {
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/sources/${source.id}/posts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: source.title,
+            visibility: "private",
+          }),
+        },
+      );
+      const post = await readResponse<Post>(response);
+
+      setPosts((current) => [post, ...current]);
+      openPostEditor(post);
+    } catch (error) {
+      setPostError(
+        error instanceof Error
+          ? error.message
+          : "Failed to create a post draft.",
+      );
+    } finally {
+      setIsCreatingPost(false);
+    }
+  }
+
+  async function saveActivePost(nextStatus?: Post["status"]) {
+    if (!activePost) {
+      return;
+    }
+
+    const title = postTitle.trim();
+    const markdownContent = postMarkdown.trim();
+    const excerpt = postExcerpt.trim();
+
+    if (!title || !markdownContent) {
+      setPostError("Add a title and content before publishing.");
+      return;
+    }
+
+    setIsSavingPost(true);
+    setPostError("");
+
+    try {
+      const response = await apiFetch(
+        `/workspaces/${workspaceId}/posts/${activePost.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            markdown_content: markdownContent,
+            excerpt: excerpt || null,
+            visibility: postVisibility,
+            status: nextStatus ?? activePost.status,
+          }),
+        },
+      );
+      const updatedPost = await readResponse<Post>(response);
+
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === updatedPost.id ? updatedPost : post,
+        ),
+      );
+      openPostEditor(updatedPost);
+    } catch (error) {
+      setPostError(
+        error instanceof Error ? error.message : "Failed to save post.",
+      );
+    } finally {
+      setIsSavingPost(false);
     }
   }
 
@@ -596,6 +747,7 @@ export default function WorkspaceDetailPage() {
       setRawText("");
       setSources(data.sourcesData);
       setChunks(data.chunksData);
+      setPosts(data.postsData);
     } catch (error) {
       setSourceError(
         error instanceof Error ? error.message : "Failed to save source.",
@@ -646,6 +798,7 @@ export default function WorkspaceDetailPage() {
       setSelectedFile(null);
       setSources(data.sourcesData);
       setChunks(data.chunksData);
+      setPosts(data.postsData);
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -760,6 +913,9 @@ export default function WorkspaceDetailPage() {
     );
   }
 
+  const activePostSource = sourceForPost(activePost);
+  const previewLines = postMarkdown.trim().split("\n").filter(Boolean);
+
   return (
     <main className={styles.shell}>
       <nav className={styles.nav}>
@@ -789,31 +945,26 @@ export default function WorkspaceDetailPage() {
               onSubmit={updateWorkspace}
               className={styles.workspaceEditForm}
             >
-              <div className={styles.workspaceEditHeader}>
-                <p className={styles.eyebrow}>Research workspace</p>
-                <span>Editing details</span>
-              </div>
-              <label>
-                <span>Name</span>
-                <input
-                  value={workspaceName}
-                  onChange={(event) => setWorkspaceName(event.target.value)}
-                  disabled={isUpdatingWorkspace}
-                  maxLength={255}
-                />
-              </label>
-              <label>
-                <span>Description</span>
-                <textarea
-                  value={workspaceDescription}
-                  onChange={(event) =>
-                    setWorkspaceDescription(event.target.value)
-                  }
-                  disabled={isUpdatingWorkspace}
-                  rows={3}
-                  maxLength={1000}
-                />
-              </label>
+              <p className={styles.eyebrow}>Research workspace</p>
+              <input
+                className={styles.workspaceTitleInput}
+                aria-label="Workspace name"
+                value={workspaceName}
+                onChange={(event) => setWorkspaceName(event.target.value)}
+                disabled={isUpdatingWorkspace}
+                maxLength={255}
+              />
+              <textarea
+                className={styles.workspaceDescriptionInput}
+                aria-label="Workspace description"
+                value={workspaceDescription}
+                onChange={(event) =>
+                  setWorkspaceDescription(event.target.value)
+                }
+                disabled={isUpdatingWorkspace}
+                rows={2}
+                maxLength={1000}
+              />
               {workspaceError && (
                 <p className={styles.error} role="alert">
                   {workspaceError}
@@ -879,6 +1030,166 @@ export default function WorkspaceDetailPage() {
                 </p>
               </div>
               <Link href="/auth">Create a private workspace →</Link>
+            </section>
+          )}
+
+          {!demoMode && activePost && (
+            <section className={`${styles.card} ${styles.publishPanel}`}>
+              <div className={styles.sectionHeading}>
+                <div>
+                  <p className={styles.step}>Publishing</p>
+                  <h2>
+                    {activePost.status === "published"
+                      ? "Edit published post"
+                      : "Review post draft"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={closePostEditor}
+                  disabled={isSavingPost}
+                >
+                  Close
+                </button>
+              </div>
+
+              <p className={styles.sectionCopy}>
+                {activePostSource
+                  ? `Created from "${activePostSource.title}". Source edits will not change this draft automatically.`
+                  : "This post is detached from its original source."}
+              </p>
+
+              {postError && (
+                <p className={styles.error} role="alert">
+                  {postError}
+                </p>
+              )}
+
+              <div className={styles.publishGrid}>
+                <form
+                  className={styles.publishForm}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveActivePost();
+                  }}
+                >
+                  <label>
+                    Title
+                    <input
+                      value={postTitle}
+                      onChange={(event) => setPostTitle(event.target.value)}
+                      disabled={isSavingPost}
+                      maxLength={255}
+                    />
+                  </label>
+
+                  <label>
+                    Excerpt
+                    <textarea
+                      value={postExcerpt}
+                      onChange={(event) => setPostExcerpt(event.target.value)}
+                      disabled={isSavingPost}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="Short summary for the feed"
+                    />
+                  </label>
+
+                  <label>
+                    Visibility
+                    <select
+                      value={postVisibility}
+                      onChange={(event) =>
+                        setPostVisibility(
+                          event.target.value as Post["visibility"],
+                        )
+                      }
+                      disabled={isSavingPost}
+                    >
+                      <option value="private">Private draft</option>
+                      <option value="unlisted">Unlisted link</option>
+                      <option value="public">Public feed</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Markdown content
+                    <textarea
+                      value={postMarkdown}
+                      onChange={(event) => setPostMarkdown(event.target.value)}
+                      disabled={isSavingPost}
+                      rows={12}
+                      className={styles.postMarkdownInput}
+                    />
+                  </label>
+
+                  <div className={styles.publishActions}>
+                    <button type="submit" disabled={isSavingPost}>
+                      {isSavingPost ? "Saving..." : "Save draft"}
+                    </button>
+                    {activePost.status === "published" ? (
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => void saveActivePost("draft")}
+                        disabled={isSavingPost}
+                      >
+                        Unpublish
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.publishButtonSolid}
+                        onClick={() => void saveActivePost("published")}
+                        disabled={isSavingPost}
+                      >
+                        Publish
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                <aside className={styles.postPreview}>
+                  <div className={styles.postPreviewHeader}>
+                    <span>{postVisibility}</span>
+                    <strong>
+                      {activePost.status === "published"
+                        ? "Published"
+                        : "Draft preview"}
+                    </strong>
+                  </div>
+                  <article>
+                    <h3>{postTitle || "Untitled post"}</h3>
+                    {(postExcerpt || activePost.excerpt) && (
+                      <p className={styles.previewExcerpt}>
+                        {postExcerpt || activePost.excerpt}
+                      </p>
+                    )}
+                    <div className={styles.previewBody}>
+                      {previewLines.length === 0 ? (
+                        <p>Write Markdown content to preview the post.</p>
+                      ) : (
+                        previewLines.slice(0, 16).map((line, index) => {
+                          if (line.startsWith("# ")) {
+                            return <h4 key={index}>{line.slice(2)}</h4>;
+                          }
+
+                          if (line.startsWith("## ")) {
+                            return <h5 key={index}>{line.slice(3)}</h5>;
+                          }
+
+                          if (line.startsWith("- ")) {
+                            return <p key={index}>• {line.slice(2)}</p>;
+                          }
+
+                          return <p key={index}>{line}</p>;
+                        })
+                      )}
+                    </div>
+                  </article>
+                </aside>
+              </div>
             </section>
           )}
 
@@ -1488,13 +1799,21 @@ export default function WorkspaceDetailPage() {
               </div>
             ) : (
               <div className={styles.list}>
-                {sources.map((source) => (
+                {sources.map((source) => {
+                  const sourcePost = postForSource(source.id);
+
+                  return (
                   <article key={source.id} className={styles.sourceItem}>
                     <div className={styles.itemMeta}>
                       <span>{source.source_type}</span>
                       <time dateTime={source.created_at}>
                         {formatDate(source.created_at)}
                       </time>
+                      {sourcePost && (
+                        <span className={styles.postStatus}>
+                          {sourcePost.status}
+                        </span>
+                      )}
                     </div>
                     {editingSourceId === source.id ? (
                       <form
@@ -1504,17 +1823,15 @@ export default function WorkspaceDetailPage() {
                           void updateSourceTitle(source);
                         }}
                       >
-                        <label>
-                          <span>Source name</span>
-                          <input
-                            value={sourceEditTitle}
-                            onChange={(event) =>
-                              setSourceEditTitle(event.target.value)
-                            }
-                            disabled={savingSourceId === source.id}
-                            maxLength={255}
-                          />
-                        </label>
+                        <input
+                          aria-label="Source name"
+                          value={sourceEditTitle}
+                          onChange={(event) =>
+                            setSourceEditTitle(event.target.value)
+                          }
+                          disabled={savingSourceId === source.id}
+                          maxLength={255}
+                        />
                         {sourceEditError && (
                           <p className={styles.inlineError} role="alert">
                             {sourceEditError}
@@ -1555,38 +1872,54 @@ export default function WorkspaceDetailPage() {
                       {source.raw_text.slice(0, 150)}
                       {source.raw_text.length > 150 ? "…" : ""}
                     </p>
-                    <button
-                      type="button"
-                      className={styles.viewButton}
-                      onClick={() =>
-                        setDetailView({ kind: "source", item: source })
-                      }
-                    >
-                      View full source
-                      <span aria-hidden="true">→</span>
-                    </button>
-                    {!demoMode && (
+                    <div className={styles.sourceActions}>
                       <button
                         type="button"
-                        className={styles.renameButton}
-                        onClick={() => startSourceEdit(source)}
-                        disabled={editingSourceId === source.id}
+                        className={styles.viewButton}
+                        onClick={() =>
+                          setDetailView({ kind: "source", item: source })
+                        }
                       >
-                        Rename
+                        View full source
+                        <span aria-hidden="true">→</span>
                       </button>
-                    )}
-                    {!demoMode && (
-                      <button
-                        type="button"
-                        className={styles.deleteButton}
-                        onClick={() => requestDeleteSource(source)}
-                        disabled={deletingSourceId === source.id}
-                      >
-                        {deletingSourceId === source.id
-                          ? "Deleting..."
-                          : "Delete source"}
-                      </button>
-                    )}
+                      {!demoMode && (
+                        <button
+                          type="button"
+                          className={styles.publishButton}
+                          onClick={() => void createOrOpenPostForSource(source)}
+                          disabled={isCreatingPost}
+                        >
+                          {sourcePost
+                            ? sourcePost.status === "published"
+                              ? "Edit post"
+                              : "Edit draft"
+                            : "Publish"}
+                        </button>
+                      )}
+                      {!demoMode && (
+                        <button
+                          type="button"
+                          className={styles.renameButton}
+                          onClick={() => startSourceEdit(source)}
+                          disabled={editingSourceId === source.id}
+                        >
+                          Rename
+                        </button>
+                      )}
+                      {!demoMode && (
+                        <button
+                          type="button"
+                          className={styles.deleteButton}
+                          onClick={() => requestDeleteSource(source)}
+                          disabled={deletingSourceId === source.id}
+                        >
+                          {deletingSourceId === source.id
+                            ? "Deleting..."
+                            : "Delete source"}
+                        </button>
+                      )}
+                    </div>
                     {pendingDeleteSourceId === source.id && (
                       <div
                         className={styles.deleteConfirmCard}
@@ -1625,7 +1958,8 @@ export default function WorkspaceDetailPage() {
                       </div>
                     )}
                   </article>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>

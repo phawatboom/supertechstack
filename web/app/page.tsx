@@ -36,7 +36,7 @@ type PublicFeedPost = {
   markdown_content: string;
   excerpt: string | null;
   cover_image_url: string | null;
-  visibility: "private" | "workspace" | "public";
+  visibility: "private" | "workspace" | "unlisted" | "public";
   status: "draft" | "published" | "archived";
   published_at: string | null;
   created_at: string;
