@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   type FormEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
@@ -141,6 +143,14 @@ const fallbackAnswerDefaults: AnswerDefaults = {
   max_retrieval_limit: 20,
   max_output_tokens: 2000,
   save_report: true,
+};
+
+const markdownComponents = {
+  table: ({ children }: { children?: ReactNode }) => (
+    <div className={styles.markdownTableWrapper}>
+      <table>{children}</table>
+    </div>
+  ),
 };
 
 function formatFileSize(bytes: number) {
@@ -922,7 +932,13 @@ export default function WorkspaceDetailPage() {
     <main className={styles.shell}>
       <nav className={styles.nav}>
         <Link href="/" className={styles.backLink}>
-          <span aria-hidden="true">←</span> All workspaces
+          <ArrowLeft
+            aria-hidden="true"
+            className={styles.arrowLeft}
+            size={16}
+            strokeWidth={1.75}
+          />
+          <span>All workspaces</span>
         </Link>
         <div className={styles.navActions}>
           <span className={styles.workspaceId}>
@@ -1180,7 +1196,10 @@ export default function WorkspaceDetailPage() {
                       {previewMarkdown.length === 0 ? (
                         <p>Write Markdown content to preview the post.</p>
                       ) : (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={markdownComponents}
+                        >
                           {previewMarkdown}
                         </ReactMarkdown>
                       )}
@@ -1435,7 +1454,11 @@ export default function WorkspaceDetailPage() {
                               }
                             >
                               View full passage
-                              <span aria-hidden="true">→</span>
+                              <ArrowRight
+                                aria-hidden="true"
+                                className={styles.arrowRight}
+                                size={14}
+                              />
                             </button>
                           )}
                         </article>
@@ -1879,7 +1902,11 @@ export default function WorkspaceDetailPage() {
                         }
                       >
                         View full source
-                        <span aria-hidden="true">→</span>
+                        <ArrowRight
+                          aria-hidden="true"
+                          className={styles.arrowRight}
+                          size={14}
+                        />
                       </button>
                       {!demoMode && (
                         <button
@@ -1990,7 +2017,11 @@ export default function WorkspaceDetailPage() {
                       }
                     >
                       View full chunk
-                      <span aria-hidden="true">→</span>
+                      <ArrowRight
+                        aria-hidden="true"
+                        className={styles.arrowRight}
+                        size={14}
+                      />
                     </button>
                   </article>
                 ))}

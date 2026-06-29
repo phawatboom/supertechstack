@@ -46,10 +46,27 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function removeInternalCitations(markdown: string) {
+  return markdown.replace(/□cite(?:□[^□\s]+)+□/g, "").trim();
+}
+
 function MarkdownContent({ markdown }: { markdown: string }) {
+  const sanitizedMarkdown = removeInternalCitations(markdown);
+
   return (
     <div className={styles.postBody}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          table: ({ children }) => (
+            <div className={styles.tableWrapper}>
+              <table>{children}</table>
+            </div>
+          ),
+        }}
+      >
+        {sanitizedMarkdown}
+      </ReactMarkdown>
     </div>
   );
 }

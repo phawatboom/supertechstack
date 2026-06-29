@@ -69,7 +69,7 @@
 
 .backLink {
   display: inline-flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   color: #475569;
   font-size: 14px;
@@ -77,8 +77,16 @@
   text-decoration: none;
 }
 
+.backLink svg {
+  transition: transform 150ms ease;
+}
+
 .backLink:hover {
   color: #4f46e5;
+}
+
+.backLink:hover .arrowLeft {
+  transform: translateX(-2px);
 }
 
 .workspaceId,
@@ -467,10 +475,12 @@
 
 .previewBody {
   max-height: 420px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   color: #334155;
   font-size: 13px;
   line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .previewBody > * + * {
@@ -543,10 +553,20 @@
   background: #f8fafc;
 }
 
+.markdownTableWrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid #dfe3ec;
+  border-radius: 10px;
+}
+
 .previewBody table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 12px;
   line-height: 1.45;
 }
@@ -557,6 +577,8 @@
   border: 1px solid #dfe3ec;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .previewBody th {
@@ -1149,12 +1171,17 @@
   margin-left: 14px;
 }
 
-.viewButton span {
+.arrowLeft,
+.arrowRight {
+  flex: 0 0 auto;
+}
+
+.viewButton svg {
   transition: transform 150ms ease;
 }
 
-.viewButton:hover span {
-  transform: translateX(3px);
+.viewButton:hover .arrowRight {
+  transform: translateX(2px);
 }
 
 .viewButton:disabled,

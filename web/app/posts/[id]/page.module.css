@@ -43,6 +43,7 @@
 }
 
 .post {
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -98,11 +99,12 @@
 }
 
 .postBody {
+  min-width: 0;
   padding: clamp(26px, 5vw, 46px);
-  overflow-x: auto;
   color: #334155;
   font-size: 16px;
   line-height: 1.85;
+  overflow-wrap: anywhere;
 }
 
 .postBody > * + * {
@@ -215,23 +217,33 @@
   font-size: inherit;
 }
 
-.postBody table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  overflow: hidden;
+.tableWrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
   border: 1px solid #dfe3ec;
   border-radius: 12px;
+}
+
+.postBody table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: fixed;
   font-size: 14px;
   line-height: 1.55;
 }
 
 .postBody th,
 .postBody td {
+  max-width: 420px;
   padding: 10px 12px;
   border: 1px solid #dfe3ec;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .postBody th {
