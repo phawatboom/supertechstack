@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   type FormEvent,
@@ -305,7 +306,12 @@ export default function HomePage() {
           </div>
           <div className={styles.heroActions}>
             <Link href="/demo" className={styles.primaryAction}>
-              Explore demo workspace <span aria-hidden="true">→</span>
+              <span>Explore demo workspace</span>
+              <ArrowRight
+                aria-hidden="true"
+                className={styles.arrowRight}
+                size={14}
+              />
             </Link>
             {!session && (
               <Link href="/auth?mode=sign-up" className={styles.secondaryAction}>
@@ -366,7 +372,6 @@ export default function HomePage() {
 
             <button type="submit" disabled={isCreating}>
               {isCreating ? "Creating workspace…" : "Create workspace"}
-              {!isCreating && <span aria-hidden="true">→</span>}
             </button>
           </form>
         </div>

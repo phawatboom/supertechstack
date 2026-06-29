@@ -98,7 +98,7 @@
   display: inline-flex;
   min-height: 48px;
   align-items: center;
-  gap: 26px;
+  gap: 6px;
   margin-top: 28px;
   padding: 0 18px;
   border: 1px solid rgba(255, 255, 255, 0.24);
@@ -112,9 +112,18 @@
   transition: background 150ms ease, transform 150ms ease;
 }
 
+.arrowRight {
+  flex: 0 0 auto;
+  transition: transform 150ms ease;
+}
+
 .demoButton:hover {
   transform: translateY(-1px);
   background: rgba(255, 255, 255, 0.16);
+}
+
+.demoButton:hover .arrowRight {
+  transform: translateX(2px);
 }
 
 .benefits {
@@ -313,7 +322,7 @@
   display: flex;
   min-height: 52px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 0 18px 0 20px;
   border: 0;
   border-radius: 12px;
@@ -335,10 +344,6 @@
 .submitButton:disabled {
   cursor: wait;
   opacity: 0.65;
-}
-
-.submitButton span:last-child {
-  font-size: 19px;
 }
 
 .legal {

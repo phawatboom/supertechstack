@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { getSupabaseClient } from "../lib/supabase";
 import styles from "./page.module.css";
@@ -84,7 +85,12 @@ export default function AuthPage() {
             generate answers backed by clear citations.
           </p>
           <Link href="/demo" className={styles.demoButton}>
-            Explore the live demo <span aria-hidden="true">→</span>
+            <span>Explore the live demo</span>
+            <ArrowRight
+              aria-hidden="true"
+              className={styles.arrowRight}
+              size={14}
+            />
           </Link>
         </div>
 
@@ -207,7 +213,6 @@ export default function AuthPage() {
                     ? "Sign in"
                     : "Create account"}
               </span>
-              {!isSubmitting && <span aria-hidden="true">→</span>}
             </button>
           </form>
 
