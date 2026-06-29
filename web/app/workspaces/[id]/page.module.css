@@ -1195,6 +1195,73 @@
   line-height: 1.65;
 }
 
+.savedReferences {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #edf0f5;
+}
+
+.savedReferencesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.savedReferencesHeader h3 {
+  margin: 0;
+  color: #273249;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.savedReferencesHeader span {
+  display: inline-flex;
+  min-width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dfe5f0;
+  border-radius: 999px;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.savedReferencesList {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.savedReferenceItem {
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.savedReferenceItem a {
+  display: inline-block;
+  margin-top: 8px;
+  color: #273249;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.savedReferenceItem a:hover {
+  color: #4f46e5;
+}
+
+.savedReferenceItem p {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .viewButton,
 .publishButton,
 .renameButton,

@@ -58,6 +58,16 @@ type Post = {
   updated_at: string;
 };
 
+type SavedPost = {
+  workspace_id: number;
+  post_id: number;
+  saved_by: string;
+  created_at: string;
+  title: string;
+  visibility: Post["visibility"];
+  status: Post["status"];
+};
+
 type Chunk = {
   id: number;
   source_id: number;
@@ -253,6 +263,7 @@ export default function WorkspaceDetailPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceError, setSourceError] = useState("");
+  const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
   const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
   const [sourceEditTitle, setSourceEditTitle] = useState("");
   const [savingSourceId, setSavingSourceId] = useState<number | null>(null);
@@ -326,6 +337,7 @@ export default function WorkspaceDetailPage() {
         workspaceData,
         sourcesData,
         chunksData,
+        savedPostsData: [] as SavedPost[],
         postsData: [] as Post[],
         tracesData: [] as AnswerTraceSummary[],
         defaultsData: {
@@ -336,21 +348,26 @@ export default function WorkspaceDetailPage() {
       };
     }
 
-    const [tracesResponse, defaultsResponse] = await Promise.all([
-      apiFetch(`/workspaces/${workspaceId}/answer-traces`),
-      apiFetch("/answer-settings/defaults"),
-    ]);
-    const [postsResponse, tracesData, defaultsData] = await Promise.all([
-      apiFetch(`/workspaces/${workspaceId}/posts`),
-      readResponse<AnswerTraceSummary[]>(tracesResponse),
-      readResponse<AnswerDefaults>(defaultsResponse),
-    ]);
+    const [savedPostsResponse, tracesResponse, defaultsResponse] =
+      await Promise.all([
+        apiFetch(`/workspaces/${workspaceId}/saved-posts`),
+        apiFetch(`/workspaces/${workspaceId}/answer-traces`),
+        apiFetch("/answer-settings/defaults"),
+      ]);
+    const [postsResponse, savedPostsData, tracesData, defaultsData] =
+      await Promise.all([
+        apiFetch(`/workspaces/${workspaceId}/posts`),
+        readResponse<SavedPost[]>(savedPostsResponse),
+        readResponse<AnswerTraceSummary[]>(tracesResponse),
+        readResponse<AnswerDefaults>(defaultsResponse),
+      ]);
     const postsData = await readResponse<Post[]>(postsResponse);
 
     return {
       workspaceData,
       sourcesData,
       chunksData,
+      savedPostsData,
       postsData,
       tracesData,
       defaultsData,
@@ -366,6 +383,7 @@ export default function WorkspaceDetailPage() {
           workspaceData,
           sourcesData,
           chunksData,
+          savedPostsData,
           postsData,
           tracesData,
           defaultsData,
@@ -375,6 +393,7 @@ export default function WorkspaceDetailPage() {
           setWorkspaceName(workspaceData.name);
           setWorkspaceDescription(workspaceData.description ?? "");
           setSources(sourcesData);
+          setSavedPosts(savedPostsData);
           setPosts(postsData);
           setChunks(chunksData);
           setAnswerTraces(tracesData);
@@ -1889,8 +1908,11 @@ export default function WorkspaceDetailPage() {
             {sources.length === 0 ? (
               <div className={styles.emptyState}>
                 <span aria-hidden="true">＋</span>
-                <p>No sources yet</p>
-                <small>Your saved references will appear here.</small>
+                <p>No uploaded sources yet</p>
+                <small>
+                  Upload or import content to make it searchable in this
+                  workspace.
+                </small>
               </div>
             ) : (
               <div className={styles.list}>
@@ -2060,6 +2082,37 @@ export default function WorkspaceDetailPage() {
                   </article>
                   );
                 })}
+              </div>
+            )}
+
+            {savedPosts.length > 0 && (
+              <div className={styles.savedReferences}>
+                <div className={styles.savedReferencesHeader}>
+                  <h3>Saved references</h3>
+                  <span>{savedPosts.length}</span>
+                </div>
+                <div className={styles.savedReferencesList}>
+                  {savedPosts.map((savedPost) => (
+                    <article
+                      key={savedPost.post_id}
+                      className={styles.savedReferenceItem}
+                    >
+                      <div className={styles.itemMeta}>
+                        <span>{savedPost.status}</span>
+                        <time dateTime={savedPost.created_at}>
+                          {formatDate(savedPost.created_at)}
+                        </time>
+                      </div>
+                      <Link href={`/posts/${savedPost.post_id}`}>
+                        {savedPost.title}
+                      </Link>
+                      <p>
+                        Saved post reference. Importing for RAG can be added as
+                        the next step.
+                      </p>
+                    </article>
+                  ))}
+                </div>
               </div>
             )}
           </section>
