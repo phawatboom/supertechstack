@@ -315,6 +315,9 @@ export default function WorkspaceDetailPage() {
   const [isLoadingTrace, setIsLoadingTrace] = useState(false);
   const [traceError, setTraceError] = useState("");
   const [detailView, setDetailView] = useState<DetailView | null>(null);
+  const [sourceDetailMode, setSourceDetailMode] = useState<
+    "preview" | "source"
+  >("preview");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const closeDetailButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -446,6 +449,11 @@ export default function WorkspaceDetailPage() {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [detailView]);
+
+  function openSourceDetail(source: Source) {
+    setSourceDetailMode("preview");
+    setDetailView({ kind: "source", item: source });
+  }
 
   function sourceTitleForChunk(chunk: Chunk) {
     return (
@@ -1994,9 +2002,7 @@ export default function WorkspaceDetailPage() {
                       <button
                         type="button"
                         className={styles.viewButton}
-                        onClick={() =>
-                          setDetailView({ kind: "source", item: source })
-                        }
+                        onClick={() => openSourceDetail(source)}
                       >
                         View full source
                         <ArrowRight
@@ -2190,6 +2196,35 @@ export default function WorkspaceDetailPage() {
                       }`}
                 </h2>
               </div>
+              {detailView.kind === "source" && (
+                <div
+                  className={styles.sourceViewToggle}
+                  aria-label="Source display mode"
+                >
+                  <button
+                    type="button"
+                    className={
+                      sourceDetailMode === "preview"
+                        ? styles.sourceViewToggleActive
+                        : ""
+                    }
+                    onClick={() => setSourceDetailMode("preview")}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      sourceDetailMode === "source"
+                        ? styles.sourceViewToggleActive
+                        : ""
+                    }
+                    onClick={() => setSourceDetailMode("source")}
+                  >
+                    Source
+                  </button>
+                </div>
+              )}
               <button
                 ref={closeDetailButtonRef}
                 type="button"
@@ -2207,7 +2242,10 @@ export default function WorkspaceDetailPage() {
                   <span>{detailView.item.source_type}</span>
                   <span>{formatDate(detailView.item.created_at)}</span>
                   <span>
-                    {detailView.item.raw_text.length.toLocaleString()} characters
+                    {(
+                      detailView.item.markdown_content ||
+                      detailView.item.raw_text
+                    ).length.toLocaleString()} characters
                   </span>
                   {detailView.item.file_size !== null && (
                     <span>{formatFileSize(detailView.item.file_size)}</span>
@@ -2216,9 +2254,28 @@ export default function WorkspaceDetailPage() {
                     <span>{detailView.item.original_filename}</span>
                   )}
                 </div>
-                <div className={styles.fullContent}>
-                  {cleanCopiedText(detailView.item.raw_text)}
-                </div>
+                {sourceDetailMode === "preview" ? (
+                  <div
+                    className={`${styles.fullContent} ${styles.markdownContent}`}
+                  >
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={markdownComponents}
+                    >
+                      {cleanCopiedText(
+                        detailView.item.markdown_content ||
+                          detailView.item.raw_text,
+                      )}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className={styles.fullContent}>
+                    {cleanCopiedText(
+                      detailView.item.markdown_content ||
+                        detailView.item.raw_text,
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <>
