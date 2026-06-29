@@ -15,7 +15,7 @@ from app.schemas.post import (
     PostResponse,
     PostUpdate,
 )
-from app.security import Principal, get_owned_workspace
+from app.security import Principal, get_owned_workspace, optional_principal
 from app.services.content_representations import normalize_markdown_content
 from app.services.post_publishing import (
     create_post_from_source,
@@ -79,24 +79,33 @@ def list_public_feed_posts(
 )
 def get_public_post(
     post_id: int,
+    principal: Principal | None = Depends(optional_principal),
     database_session: Session = Depends(get_database_session),
 ):
     row = (
-        database_session.query(Post, Workspace.name, Source.title)
+        database_session.query(Post, Workspace.name, Workspace.owner_id, Source.title)
         .join(Workspace, Workspace.id == Post.workspace_id)
         .outerjoin(Source, Source.id == Post.source_id)
-        .filter(
-            Post.id == post_id,
-            Post.status == "published",
-            Post.visibility.in_(["public", "unlisted"]),
-        )
+        .filter(Post.id == post_id)
         .first()
     )
 
     if row is None:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    post, workspace_name, source_title = row
+    post, workspace_name, workspace_owner_id, source_title = row
+    is_publicly_readable = (
+        post.status == "published"
+        and post.visibility in {"public", "unlisted"}
+    )
+    is_owner = (
+        principal is not None
+        and workspace_owner_id == principal.owner_id
+    )
+
+    if not is_publicly_readable and not is_owner:
+        raise HTTPException(status_code=404, detail="Post not found")
+
     return PublicPostResponse.model_validate(
         {
             **post.__dict__,

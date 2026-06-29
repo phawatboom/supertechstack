@@ -366,10 +366,12 @@ def test_public_post_page_reads_public_and_unlisted_posts(
 
     public_response = get_public_post(
         post_id=public_post.id,
+        principal=None,
         database_session=database_session,
     )
     unlisted_response = get_public_post(
         post_id=unlisted_post.id,
+        principal=None,
         database_session=database_session,
     )
 
@@ -419,6 +421,62 @@ def test_public_post_page_hides_private_and_draft_posts(
         with pytest.raises(HTTPException) as error:
             get_public_post(
                 post_id=post.id,
+                principal=None,
+                database_session=database_session,
+            )
+
+        assert error.value.status_code == 404
+
+
+def test_workspace_owner_can_read_private_and_draft_posts(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session)
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Private source",
+        raw_text="Original notes",
+        source_type="pasted_text",
+    )
+    private_post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        post_input=None,
+        principal=principal(),
+        database_session=database_session,
+    )
+    draft_post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        post_input=CreatePostFromSourceRequest(title="Draft post"),
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    update_post(
+        workspace_id=workspace.id,
+        post_id=private_post.id,
+        post_input=PostUpdate(status="published", visibility="private"),
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    for post in [private_post, draft_post]:
+        owner_response = get_public_post(
+            post_id=post.id,
+            principal=principal(),
+            database_session=database_session,
+        )
+
+        assert owner_response.id == post.id
+        assert owner_response.workspace_name == "Publishing workspace"
+
+        with pytest.raises(HTTPException) as error:
+            get_public_post(
+                post_id=post.id,
+                principal=principal("user-b"),
                 database_session=database_session,
             )
 

@@ -196,6 +196,23 @@ def require_principal(
     )
 
 
+def optional_principal(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    settings: Settings = Depends(get_settings),
+    database_session: Session = Depends(get_database_session),
+) -> Principal | None:
+    if credentials is None and settings.auth_mode != "disabled":
+        return None
+
+    return require_principal(
+        request=request,
+        credentials=credentials,
+        settings=settings,
+        database_session=database_session,
+    )
+
+
 def get_owned_workspace(
     workspace_id: int,
     principal: Principal,

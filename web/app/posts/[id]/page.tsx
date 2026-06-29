@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { apiFetch } from "../../lib/api";
+import { cleanCopiedText } from "../../lib/text-cleanup";
 import styles from "./page.module.css";
 
 type PublicPost = {
@@ -46,12 +47,8 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function removeInternalCitations(markdown: string) {
-  return markdown.replace(/□cite(?:□[^□\s]+)+□/g, "").trim();
-}
-
 function MarkdownContent({ markdown }: { markdown: string }) {
-  const sanitizedMarkdown = removeInternalCitations(markdown);
+  const sanitizedMarkdown = cleanCopiedText(markdown);
 
   return (
     <div className={styles.postBody}>
@@ -120,7 +117,7 @@ export default function PublicPostPage() {
         <section className={styles.errorCard}>
           <Link href="/">Back to feed</Link>
           <h1>Post unavailable</h1>
-          <p>{errorMessage || "This post is not public."}</p>
+          <p>{errorMessage || "This post is not available to your account."}</p>
         </section>
       </main>
     );
@@ -142,9 +139,11 @@ export default function PublicPostPage() {
             </time>
           </div>
           <h1>{post.title}</h1>
-          {post.excerpt && <p className={styles.excerpt}>{post.excerpt}</p>}
+          {post.excerpt && (
+            <p className={styles.excerpt}>{cleanCopiedText(post.excerpt)}</p>
+          )}
           <div className={styles.provenance}>
-            <span>Read-only published post</span>
+            <span>Read-only post</span>
             {post.source_title && (
               <span>Based on source: {post.source_title}</span>
             )}
