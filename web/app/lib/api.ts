@@ -5,6 +5,10 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const betaAccessToken = process.env.NEXT_PUBLIC_BETA_ACCESS_TOKEN;
 let refreshSessionPromise: Promise<Session | null> | null = null;
 
+type ApiFetchInit = RequestInit & {
+  auth?: boolean;
+};
+
 function refreshSessionOnce(): Promise<Session | null> {
   if (refreshSessionPromise) {
     return refreshSessionPromise;
@@ -24,19 +28,25 @@ function refreshSessionOnce(): Promise<Session | null> {
 
 export async function apiFetch(
   path: string,
-  init: RequestInit = {},
+  init: ApiFetchInit = {},
 ): Promise<Response> {
+  const { auth = true, ...requestInit } = init;
+
   async function request(accessToken?: string) {
-    const headers = new Headers(init.headers);
+    const headers = new Headers(requestInit.headers);
 
     if (accessToken) {
       headers.set("Authorization", `Bearer ${accessToken}`);
     }
 
     return fetch(`${apiUrl}${path}`, {
-      ...init,
+      ...requestInit,
       headers,
     });
+  }
+
+  if (!auth) {
+    return request();
   }
 
   if (!isSupabaseConfigured) {

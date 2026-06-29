@@ -92,9 +92,22 @@ export default function PublicPostPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
+    setErrorMessage("");
 
-    void apiFetch(`/posts/${postId}`)
-      .then((response) => readResponse<PublicPost>(response))
+    async function loadPost() {
+      const publicResponse = await apiFetch(`/posts/${postId}`, {
+        auth: false,
+      });
+
+      if (publicResponse.ok || !session) {
+        return readResponse<PublicPost>(publicResponse);
+      }
+
+      return readResponse<PublicPost>(await apiFetch(`/posts/${postId}`));
+    }
+
+    void loadPost()
       .then((data) => {
         if (!cancelled) {
           setPost(data);
@@ -116,7 +129,7 @@ export default function PublicPostPage() {
     return () => {
       cancelled = true;
     };
-  }, [postId]);
+  }, [postId, session]);
 
   useEffect(() => {
     if (!session) {
