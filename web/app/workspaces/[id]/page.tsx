@@ -1144,7 +1144,7 @@ export default function WorkspaceDetailPage() {
 
                   <div className={styles.publishActions}>
                     <button type="submit" disabled={isSavingPost}>
-                      {isSavingPost ? "Saving..." : "Save draft"}
+                      {isSavingPost ? "Saving..." : "Save"}
                     </button>
                     {activePost.status === "published" ? (
                       <>

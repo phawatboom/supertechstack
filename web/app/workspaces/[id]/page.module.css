@@ -367,6 +367,29 @@
   padding: 0 12px;
 }
 
+.publishForm select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 42px;
+  background:
+    linear-gradient(45deg, transparent 50%, #64748b 50%) calc(100% - 19px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, #64748b 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
+    #fbfcfe;
+}
+
+.publishForm select:hover:not(:disabled) {
+  border-color: #b8bfe8;
+  background:
+    linear-gradient(45deg, transparent 50%, #4f46e5 50%) calc(100% - 19px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, #4f46e5 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
+    #fff;
+}
+
+.publishForm select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .publishForm textarea {
   min-height: 84px;
   padding: 11px 12px;
@@ -384,7 +407,10 @@
 .publishForm textarea:focus,
 .publishForm select:focus {
   border-color: #7770e8;
-  background: #fff;
+  background:
+    linear-gradient(45deg, transparent 50%, #4f46e5 50%) calc(100% - 19px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, #4f46e5 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
+    #fff;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
