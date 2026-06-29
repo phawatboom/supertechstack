@@ -367,27 +367,57 @@
   padding: 0 12px;
 }
 
+.publishForm .selectWrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid #d9deea;
+  border-radius: 11px;
+  background: #fbfcfe;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.publishForm .selectWrapper::after {
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #64748b;
+  border-bottom: 2px solid #64748b;
+  content: "";
+  pointer-events: none;
+  transform: translateY(-65%) rotate(45deg);
+  transition: border-color 160ms ease;
+}
+
 .publishForm select {
   appearance: none;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+  border: 0;
   padding-right: 42px;
-  background:
-    linear-gradient(45deg, transparent 50%, #64748b 50%) calc(100% - 19px) 50% / 6px 6px no-repeat,
-    linear-gradient(135deg, #64748b 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
-    #fbfcfe;
+  background: transparent;
 }
 
-.publishForm select:hover:not(:disabled) {
+.publishForm .selectWrapper:hover {
   border-color: #b8bfe8;
-  background:
-    linear-gradient(45deg, transparent 50%, #4f46e5 50%) calc(100% - 19px) 50% / 6px 6px no-repeat,
-    linear-gradient(135deg, #4f46e5 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
-    #fff;
+  background: #fff;
+}
+
+.publishForm .selectWrapper:hover::after,
+.publishForm .selectWrapper:focus-within::after {
+  border-color: #4f46e5;
 }
 
 .publishForm select:disabled {
   cursor: not-allowed;
-  opacity: 0.65;
 }
 
 .publishForm textarea {
@@ -404,14 +434,24 @@
 }
 
 .publishForm input:focus,
-.publishForm textarea:focus,
-.publishForm select:focus {
+.publishForm textarea:focus {
   border-color: #7770e8;
-  background:
-    linear-gradient(45deg, transparent 50%, #4f46e5 50%) calc(100% - 19px) 50% / 6px 6px no-repeat,
-    linear-gradient(135deg, #4f46e5 50%, transparent 50%) calc(100% - 14px) 50% / 6px 6px no-repeat,
-    #fff;
+  background: #fff;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.publishForm .selectWrapper:focus-within {
+  border-color: #7770e8;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.publishForm .selectWrapper:has(select:disabled) {
+  opacity: 0.65;
+}
+
+.publishForm select:focus {
+  box-shadow: none;
 }
 
 .publishActions {

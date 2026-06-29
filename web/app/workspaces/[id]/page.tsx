@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
+  type ClipboardEvent,
   type FormEvent,
   type ReactNode,
   useCallback,
@@ -15,6 +16,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import styles from "./page.module.css";
 import { apiFetch } from "../../lib/api";
+import { cleanCopiedText } from "../../lib/text-cleanup";
 import { useAuth } from "../../components/auth-provider";
 
 type Workspace = {
@@ -152,6 +154,33 @@ const markdownComponents = {
     </div>
   ),
 };
+
+function insertCleanPastedText(
+  event: ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+) {
+  const pastedText = event.clipboardData.getData("text");
+  const cleanedText = cleanCopiedText(pastedText, { trim: false });
+
+  if (cleanedText === pastedText) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const target = event.currentTarget;
+  const selectionStart = target.selectionStart ?? currentValue.length;
+  const selectionEnd = target.selectionEnd ?? selectionStart;
+  const nextValue = `${currentValue.slice(0, selectionStart)}${cleanedText}${currentValue.slice(selectionEnd)}`;
+  const nextCursorPosition = selectionStart + cleanedText.length;
+
+  setValue(nextValue);
+
+  window.requestAnimationFrame(() => {
+    target.setSelectionRange(nextCursorPosition, nextCursorPosition);
+  });
+}
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) {
@@ -653,9 +682,21 @@ export default function WorkspaceDetailPage() {
       return;
     }
 
-    const title = postTitle.trim();
-    const markdownContent = postMarkdown.trim();
-    const excerpt = postExcerpt.trim();
+    const title = cleanCopiedText(postTitle);
+    const markdownContent = cleanCopiedText(postMarkdown);
+    const excerpt = cleanCopiedText(postExcerpt);
+
+    if (title !== postTitle) {
+      setPostTitle(title);
+    }
+
+    if (markdownContent !== postMarkdown) {
+      setPostMarkdown(markdownContent);
+    }
+
+    if (excerpt !== postExcerpt) {
+      setPostExcerpt(excerpt);
+    }
 
     if (!title || !markdownContent) {
       setPostError("Add a title and content before publishing.");
@@ -731,8 +772,16 @@ export default function WorkspaceDetailPage() {
   async function createSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const title = sourceTitle.trim();
-    const text = rawText.trim();
+    const title = cleanCopiedText(sourceTitle);
+    const text = cleanCopiedText(rawText);
+
+    if (title !== sourceTitle) {
+      setSourceTitle(title);
+    }
+
+    if (text !== rawText) {
+      setRawText(text);
+    }
 
     if (!title || !text) {
       setSourceError("Add both a title and source text.");
@@ -926,7 +975,7 @@ export default function WorkspaceDetailPage() {
   }
 
   const activePostSource = sourceForPost(activePost);
-  const previewMarkdown = postMarkdown.trim();
+  const previewMarkdown = cleanCopiedText(postMarkdown);
 
   return (
     <main className={styles.shell}>
@@ -1097,6 +1146,9 @@ export default function WorkspaceDetailPage() {
                     <input
                       value={postTitle}
                       onChange={(event) => setPostTitle(event.target.value)}
+                      onPaste={(event) =>
+                        insertCleanPastedText(event, postTitle, setPostTitle)
+                      }
                       disabled={isSavingPost}
                       maxLength={255}
                     />
@@ -1107,6 +1159,13 @@ export default function WorkspaceDetailPage() {
                     <textarea
                       value={postExcerpt}
                       onChange={(event) => setPostExcerpt(event.target.value)}
+                      onPaste={(event) =>
+                        insertCleanPastedText(
+                          event,
+                          postExcerpt,
+                          setPostExcerpt,
+                        )
+                      }
                       disabled={isSavingPost}
                       rows={3}
                       maxLength={1000}
@@ -1116,19 +1175,21 @@ export default function WorkspaceDetailPage() {
 
                   <label>
                     Visibility
-                    <select
-                      value={postVisibility}
-                      onChange={(event) =>
-                        setPostVisibility(
-                          event.target.value as Post["visibility"],
-                        )
-                      }
-                      disabled={isSavingPost}
-                    >
-                      <option value="private">Private draft</option>
-                      <option value="unlisted">Unlisted link</option>
-                      <option value="public">Public feed</option>
-                    </select>
+                    <span className={styles.selectWrapper}>
+                      <select
+                        value={postVisibility}
+                        onChange={(event) =>
+                          setPostVisibility(
+                            event.target.value as Post["visibility"],
+                          )
+                        }
+                        disabled={isSavingPost}
+                      >
+                        <option value="private">Private draft</option>
+                        <option value="unlisted">Unlisted link</option>
+                        <option value="public">Public feed</option>
+                      </select>
+                    </span>
                   </label>
 
                   <label>
@@ -1136,6 +1197,13 @@ export default function WorkspaceDetailPage() {
                     <textarea
                       value={postMarkdown}
                       onChange={(event) => setPostMarkdown(event.target.value)}
+                      onPaste={(event) =>
+                        insertCleanPastedText(
+                          event,
+                          postMarkdown,
+                          setPostMarkdown,
+                        )
+                      }
                       disabled={isSavingPost}
                       rows={12}
                       className={styles.postMarkdownInput}
@@ -1327,6 +1395,9 @@ export default function WorkspaceDetailPage() {
                 <input
                   value={sourceTitle}
                   onChange={(event) => setSourceTitle(event.target.value)}
+                  onPaste={(event) =>
+                    insertCleanPastedText(event, sourceTitle, setSourceTitle)
+                  }
                   placeholder="e.g. Product strategy notes"
                   disabled={isSaving}
                 />
@@ -1337,6 +1408,9 @@ export default function WorkspaceDetailPage() {
                 <textarea
                   value={rawText}
                   onChange={(event) => setRawText(event.target.value)}
+                  onPaste={(event) =>
+                    insertCleanPastedText(event, rawText, setRawText)
+                  }
                   placeholder="Paste source text here…"
                   rows={9}
                   disabled={isSaving}
@@ -1822,6 +1896,7 @@ export default function WorkspaceDetailPage() {
               <div className={styles.list}>
                 {sources.map((source) => {
                   const sourcePost = postForSource(source.id);
+                  const sourceText = cleanCopiedText(source.raw_text);
 
                   return (
                   <article key={source.id} className={styles.sourceItem}>
@@ -1890,7 +1965,7 @@ export default function WorkspaceDetailPage() {
                       </div>
                     )}
                     <p>
-                      {source.raw_text.slice(0, 150)}
+                      {sourceText.slice(0, 150)}
                       {source.raw_text.length > 150 ? "…" : ""}
                     </p>
                     <div className={styles.sourceActions}>
@@ -2008,7 +2083,7 @@ export default function WorkspaceDetailPage() {
                     <span>
                       Source {chunk.source_id} · Chunk {chunk.chunk_index + 1}
                     </span>
-                    <p>{chunk.content}</p>
+                    <p>{cleanCopiedText(chunk.content)}</p>
                     <button
                       type="button"
                       className={styles.viewButton}
@@ -2089,7 +2164,7 @@ export default function WorkspaceDetailPage() {
                   )}
                 </div>
                 <div className={styles.fullContent}>
-                  {detailView.item.raw_text}
+                  {cleanCopiedText(detailView.item.raw_text)}
                 </div>
               </>
             ) : (
@@ -2103,7 +2178,7 @@ export default function WorkspaceDetailPage() {
                   <span>{formatDate(detailView.item.created_at)}</span>
                 </div>
                 <div className={styles.fullContent}>
-                  {detailView.item.content}
+                  {cleanCopiedText(detailView.item.content)}
                 </div>
               </>
             )}

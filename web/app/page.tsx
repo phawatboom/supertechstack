@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useAuth } from "./components/auth-provider";
 import { apiFetch } from "./lib/api";
+import { cleanCopiedText } from "./lib/text-cleanup";
 import {
   clearPendingWorkspace,
   readPendingWorkspace,
@@ -414,8 +415,9 @@ export default function HomePage() {
                   </div>
                   <h3>{post.title}</h3>
                   <p>
-                    {post.excerpt ||
-                      post.markdown_content.slice(0, 220)}
+                    {post.excerpt
+                      ? cleanCopiedText(post.excerpt)
+                      : cleanCopiedText(post.markdown_content).slice(0, 220)}
                   </p>
                 </div>
                 <Link href={`/posts/${post.id}`}>Read post</Link>
