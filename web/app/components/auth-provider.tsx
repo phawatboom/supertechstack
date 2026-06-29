@@ -42,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pathname === "/" ||
     pathname === "/auth" ||
     pathname === "/demo" ||
+    pathname.startsWith("/posts/") ||
     pathname.startsWith("/workspaces/");
 
   useEffect(() => {

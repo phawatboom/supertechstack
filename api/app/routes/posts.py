@@ -1,24 +1,30 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.database import get_database_session
-from app.models.post import Post
+from app.models.post import Post, PostVersion, WorkspacePostImport, WorkspacePostSave
 from app.models.source import Source
 from app.models.workspace import Workspace
 from app.rate_limit import enforce_rate_limit
 from app.schemas.post import (
     CreatePostFromSourceRequest,
+    ImportedPostResponse,
+    ImportPostRequest,
     PublicFeedPostResponse,
     PublicPostResponse,
     PostResponse,
     PostUpdate,
+    SavedPostResponse,
+    SavePostRequest,
 )
 from app.security import Principal, get_owned_workspace, optional_principal
 from app.services.content_representations import normalize_markdown_content
 from app.services.post_publishing import (
     create_post_from_source,
+    create_post_version_if_needed,
     create_unique_slug,
     publish_post_if_needed,
 )
@@ -41,6 +47,94 @@ def _get_workspace_post(
         raise HTTPException(status_code=404, detail="Post not found")
 
     return post
+
+
+def _can_read_post(
+    post: Post,
+    workspace_owner_id: str,
+    principal: Principal | None,
+) -> bool:
+    if post.status == "published" and post.visibility in {"public", "unlisted"}:
+        return True
+
+    return principal is not None and workspace_owner_id == principal.owner_id
+
+
+def _get_readable_post_row(
+    post_id: int,
+    principal: Principal | None,
+    database_session: Session,
+):
+    row = (
+        database_session.query(Post, Workspace.name, Workspace.owner_id, Source.title)
+        .join(Workspace, Workspace.id == Post.workspace_id)
+        .outerjoin(Source, Source.id == Post.source_id)
+        .filter(Post.id == post_id)
+        .first()
+    )
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    post, workspace_name, workspace_owner_id, source_title = row
+
+    if not _can_read_post(post, workspace_owner_id, principal):
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    return post, workspace_name, workspace_owner_id, source_title
+
+
+def _latest_available_post_version(
+    post_id: int,
+    database_session: Session,
+) -> PostVersion:
+    version = (
+        database_session.query(PostVersion)
+        .filter(
+            PostVersion.post_id == post_id,
+            PostVersion.is_available.is_(True),
+        )
+        .order_by(PostVersion.version_number.desc())
+        .first()
+    )
+
+    if version is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Post has no importable published version",
+        )
+
+    return version
+
+
+def _saved_post_response(
+    save: WorkspacePostSave,
+    post: Post,
+) -> SavedPostResponse:
+    return SavedPostResponse(
+        workspace_id=save.workspace_id,
+        post_id=save.post_id,
+        saved_by=save.saved_by,
+        created_at=save.created_at,
+        title=post.title,
+        visibility=post.visibility,
+        status=post.status,
+    )
+
+
+def _imported_post_response(
+    imported_post: WorkspacePostImport,
+    version: PostVersion,
+) -> ImportedPostResponse:
+    return ImportedPostResponse(
+        workspace_id=imported_post.workspace_id,
+        post_version_id=imported_post.post_version_id,
+        imported_by=imported_post.imported_by,
+        imported_at=imported_post.imported_at,
+        post_id=version.post_id,
+        version_number=version.version_number,
+        title=version.title,
+    )
 
 
 @router.get(
@@ -82,29 +176,11 @@ def get_public_post(
     principal: Principal | None = Depends(optional_principal),
     database_session: Session = Depends(get_database_session),
 ):
-    row = (
-        database_session.query(Post, Workspace.name, Workspace.owner_id, Source.title)
-        .join(Workspace, Workspace.id == Post.workspace_id)
-        .outerjoin(Source, Source.id == Post.source_id)
-        .filter(Post.id == post_id)
-        .first()
+    post, workspace_name, _, source_title = _get_readable_post_row(
+        post_id,
+        principal,
+        database_session,
     )
-
-    if row is None:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    post, workspace_name, workspace_owner_id, source_title = row
-    is_publicly_readable = (
-        post.status == "published"
-        and post.visibility in {"public", "unlisted"}
-    )
-    is_owner = (
-        principal is not None
-        and workspace_owner_id == principal.owner_id
-    )
-
-    if not is_publicly_readable and not is_owner:
-        raise HTTPException(status_code=404, detail="Post not found")
 
     return PublicPostResponse.model_validate(
         {
@@ -113,6 +189,162 @@ def get_public_post(
             "source_title": source_title,
         }
     )
+
+
+@router.post(
+    "/workspaces/{workspace_id}/saved-posts",
+    response_model=SavedPostResponse,
+)
+def save_post_to_workspace(
+    workspace_id: int,
+    save_input: SavePostRequest,
+    principal: Principal = Depends(enforce_rate_limit),
+    database_session: Session = Depends(get_database_session),
+):
+    get_owned_workspace(workspace_id, principal, database_session)
+    post, _, _, _ = _get_readable_post_row(
+        save_input.post_id,
+        principal,
+        database_session,
+    )
+    existing_save = database_session.get(
+        WorkspacePostSave,
+        {
+            "workspace_id": workspace_id,
+            "post_id": post.id,
+        },
+    )
+
+    if existing_save is not None:
+        return _saved_post_response(existing_save, post)
+
+    save = WorkspacePostSave(
+        workspace_id=workspace_id,
+        post_id=post.id,
+        saved_by=principal.owner_id,
+    )
+    database_session.add(save)
+
+    try:
+        database_session.commit()
+        database_session.refresh(save)
+    except IntegrityError:
+        database_session.rollback()
+        existing_save = database_session.get(
+            WorkspacePostSave,
+            {
+                "workspace_id": workspace_id,
+                "post_id": post.id,
+            },
+        )
+
+        if existing_save is None:
+            raise
+
+        save = existing_save
+
+    return _saved_post_response(save, post)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/saved-posts",
+    response_model=list[SavedPostResponse],
+)
+def list_saved_posts(
+    workspace_id: int,
+    principal: Principal = Depends(enforce_rate_limit),
+    database_session: Session = Depends(get_database_session),
+):
+    get_owned_workspace(workspace_id, principal, database_session)
+    rows = (
+        database_session.query(WorkspacePostSave, Post)
+        .join(Post, Post.id == WorkspacePostSave.post_id)
+        .filter(WorkspacePostSave.workspace_id == workspace_id)
+        .order_by(WorkspacePostSave.created_at.desc())
+        .all()
+    )
+
+    return [_saved_post_response(save, post) for save, post in rows]
+
+
+@router.post(
+    "/workspaces/{workspace_id}/post-imports",
+    response_model=ImportedPostResponse,
+)
+def import_post_to_workspace(
+    workspace_id: int,
+    import_input: ImportPostRequest,
+    principal: Principal = Depends(enforce_rate_limit),
+    database_session: Session = Depends(get_database_session),
+):
+    get_owned_workspace(workspace_id, principal, database_session)
+    post, _, _, _ = _get_readable_post_row(
+        import_input.post_id,
+        principal,
+        database_session,
+    )
+    version = _latest_available_post_version(post.id, database_session)
+    existing_import = database_session.get(
+        WorkspacePostImport,
+        {
+            "workspace_id": workspace_id,
+            "post_version_id": version.id,
+        },
+    )
+
+    if existing_import is not None:
+        return _imported_post_response(existing_import, version)
+
+    imported_post = WorkspacePostImport(
+        workspace_id=workspace_id,
+        post_version_id=version.id,
+        imported_by=principal.owner_id,
+    )
+    database_session.add(imported_post)
+
+    try:
+        database_session.commit()
+        database_session.refresh(imported_post)
+    except IntegrityError:
+        database_session.rollback()
+        existing_import = database_session.get(
+            WorkspacePostImport,
+            {
+                "workspace_id": workspace_id,
+                "post_version_id": version.id,
+            },
+        )
+
+        if existing_import is None:
+            raise
+
+        imported_post = existing_import
+
+    return _imported_post_response(imported_post, version)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/post-imports",
+    response_model=list[ImportedPostResponse],
+)
+def list_imported_posts(
+    workspace_id: int,
+    principal: Principal = Depends(enforce_rate_limit),
+    database_session: Session = Depends(get_database_session),
+):
+    get_owned_workspace(workspace_id, principal, database_session)
+    rows = (
+        database_session.query(WorkspacePostImport, PostVersion)
+        .join(PostVersion, PostVersion.id == WorkspacePostImport.post_version_id)
+        .filter(WorkspacePostImport.workspace_id == workspace_id)
+        .order_by(WorkspacePostImport.imported_at.desc())
+        .all()
+    )
+
+    return [
+        _imported_post_response(imported_post, version)
+        for imported_post, version in rows
+    ]
 
 
 @router.post(
@@ -212,6 +444,9 @@ def update_post(
         publish_post_if_needed(post, post_input.status)
 
     try:
+        if post.status == "published":
+            create_post_version_if_needed(database_session, post)
+
         database_session.commit()
         database_session.refresh(post)
     except Exception:

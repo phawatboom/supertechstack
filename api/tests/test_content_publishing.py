@@ -5,18 +5,33 @@ from sqlalchemy.orm import Session
 
 from app.db.database import Base
 from app.models.chunk import Chunk
-from app.models.post import Post
+from app.models.post import (
+    Post,
+    PostVersion,
+    PublicationChunk,
+    WorkspacePostImport,
+    WorkspacePostSave,
+)
 from app.models.source import Source
 from app.models.workspace import Workspace
 from app.routes.posts import (
     create_source_post,
     get_public_post,
+    import_post_to_workspace,
+    list_imported_posts,
     list_posts,
     list_public_feed_posts,
+    list_saved_posts,
+    save_post_to_workspace,
     update_post,
 )
 from app.routes.sources import delete_source, update_source
-from app.schemas.post import CreatePostFromSourceRequest, PostUpdate
+from app.schemas.post import (
+    CreatePostFromSourceRequest,
+    ImportPostRequest,
+    PostUpdate,
+    SavePostRequest,
+)
 from app.schemas.source import SourceUpdate
 from app.security import Principal
 from app.services.content_representations import markdown_to_plain_text
@@ -40,6 +55,10 @@ def stub_embeddings(monkeypatch):
 
     monkeypatch.setattr(
         "app.services.source_ingestion.create_embeddings",
+        create_embeddings,
+    )
+    monkeypatch.setattr(
+        "app.services.post_publishing.create_embeddings",
         create_embeddings,
     )
 
@@ -243,6 +262,169 @@ def test_publish_post_sets_published_at_and_list_is_owner_scoped(
 
     assert error.value.status_code == 404
     assert database_session.query(Post).count() == 1
+
+
+def test_publishing_creates_immutable_post_version_and_chunks(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session)
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Versioned post",
+        raw_text="Original notes",
+        markdown_content="# Versioned Post\n\nThis is enough content to index.",
+        source_type="pasted_text",
+    )
+    post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        post_input=None,
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    update_post(
+        workspace_id=workspace.id,
+        post_id=post.id,
+        post_input=PostUpdate(status="published", visibility="public"),
+        principal=principal(),
+        database_session=database_session,
+    )
+    first_version = database_session.query(PostVersion).one()
+
+    update_post(
+        workspace_id=workspace.id,
+        post_id=post.id,
+        post_input=PostUpdate(
+            title="Versioned post updated",
+            markdown_content="# Versioned Post\n\nUpdated content.",
+        ),
+        principal=principal(),
+        database_session=database_session,
+    )
+    versions = (
+        database_session.query(PostVersion)
+        .filter(PostVersion.post_id == post.id)
+        .order_by(PostVersion.version_number)
+        .all()
+    )
+
+    assert first_version.version_number == 1
+    assert [version.version_number for version in versions] == [1, 2]
+    assert versions[0].title == "Versioned post"
+    assert versions[1].title == "Versioned post updated"
+    assert database_session.query(PublicationChunk).count() >= 2
+
+
+def test_saving_post_to_workspace_is_live_reference_and_idempotent(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session)
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Save me",
+        raw_text="Original notes",
+        source_type="pasted_text",
+    )
+    post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        post_input=None,
+        principal=principal(),
+        database_session=database_session,
+    )
+    update_post(
+        workspace_id=workspace.id,
+        post_id=post.id,
+        post_input=PostUpdate(status="published", visibility="public"),
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    first_save = save_post_to_workspace(
+        workspace_id=workspace.id,
+        save_input=SavePostRequest(post_id=post.id),
+        principal=principal(),
+        database_session=database_session,
+    )
+    second_save = save_post_to_workspace(
+        workspace_id=workspace.id,
+        save_input=SavePostRequest(post_id=post.id),
+        principal=principal(),
+        database_session=database_session,
+    )
+    saves = list_saved_posts(
+        workspace_id=workspace.id,
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    assert first_save.post_id == post.id
+    assert second_save.post_id == post.id
+    assert len(saves) == 1
+    assert database_session.query(WorkspacePostSave).count() == 1
+
+
+def test_importing_post_pins_current_available_version(
+    database_session: Session,
+    stub_embeddings,
+):
+    workspace = create_workspace(database_session)
+    source = ingest_source_text(
+        database_session=database_session,
+        workspace_id=workspace.id,
+        title="Import me",
+        raw_text="Original notes",
+        source_type="pasted_text",
+    )
+    post = create_source_post(
+        workspace_id=workspace.id,
+        source_id=source.id,
+        post_input=None,
+        principal=principal(),
+        database_session=database_session,
+    )
+    update_post(
+        workspace_id=workspace.id,
+        post_id=post.id,
+        post_input=PostUpdate(status="published", visibility="public"),
+        principal=principal(),
+        database_session=database_session,
+    )
+    first_import = import_post_to_workspace(
+        workspace_id=workspace.id,
+        import_input=ImportPostRequest(post_id=post.id),
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    update_post(
+        workspace_id=workspace.id,
+        post_id=post.id,
+        post_input=PostUpdate(markdown_content="Updated published content"),
+        principal=principal(),
+        database_session=database_session,
+    )
+    second_import = import_post_to_workspace(
+        workspace_id=workspace.id,
+        import_input=ImportPostRequest(post_id=post.id),
+        principal=principal(),
+        database_session=database_session,
+    )
+    imports = list_imported_posts(
+        workspace_id=workspace.id,
+        principal=principal(),
+        database_session=database_session,
+    )
+
+    assert first_import.version_number == 1
+    assert second_import.version_number == 2
+    assert {item.version_number for item in imports} == {1, 2}
+    assert database_session.query(WorkspacePostImport).count() == 2
 
 
 def test_public_feed_only_lists_public_published_posts(

@@ -48,6 +48,14 @@ class PostUpdate(BaseModel):
         return self
 
 
+class SavePostRequest(BaseModel):
+    post_id: int = Field(gt=0)
+
+
+class ImportPostRequest(BaseModel):
+    post_id: int = Field(gt=0)
+
+
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -73,3 +81,40 @@ class PublicFeedPostResponse(PostResponse):
 
 class PublicPostResponse(PublicFeedPostResponse):
     source_title: str | None
+
+
+class PostVersionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    post_id: int
+    version_number: int
+    author_id: str
+    title: str
+    slug: str
+    excerpt: str | None
+    cover_image_url: str | None
+    visibility: PostVisibility
+    published_at: datetime
+    is_available: bool
+    created_at: datetime
+
+
+class SavedPostResponse(BaseModel):
+    workspace_id: int
+    post_id: int
+    saved_by: str
+    created_at: datetime
+    title: str
+    visibility: PostVisibility
+    status: PostStatus
+
+
+class ImportedPostResponse(BaseModel):
+    workspace_id: int
+    post_version_id: int
+    imported_by: str
+    imported_at: datetime
+    post_id: int
+    version_number: int
+    title: str

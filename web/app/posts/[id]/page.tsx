@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useAuth } from "../../components/auth-provider";
 import { apiFetch } from "../../lib/api";
 import { cleanCopiedText } from "../../lib/text-cleanup";
 import styles from "./page.module.css";
@@ -26,6 +27,14 @@ type PublicPost = {
   updated_at: string;
   workspace_name: string;
   source_title: string | null;
+};
+
+type Workspace = {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -71,9 +80,15 @@ function MarkdownContent({ markdown }: { markdown: string }) {
 export default function PublicPostPage() {
   const params = useParams<{ id: string }>();
   const postId = params.id;
+  const { session } = useAuth();
   const [post, setPost] = useState<PublicPost | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingPost, setIsSavingPost] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +117,63 @@ export default function PublicPostPage() {
       cancelled = true;
     };
   }, [postId]);
+
+  useEffect(() => {
+    if (!session) {
+      setWorkspaces([]);
+      setSelectedWorkspaceId("");
+      return;
+    }
+
+    let cancelled = false;
+
+    void apiFetch("/workspaces")
+      .then((response) => readResponse<Workspace[]>(response))
+      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+
+        setWorkspaces(data);
+        setSelectedWorkspaceId((current) => current || String(data[0]?.id ?? ""));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWorkspaces([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  async function savePostToWorkspace() {
+    if (!post || !selectedWorkspaceId) {
+      return;
+    }
+
+    setIsSavingPost(true);
+    setSaveMessage("");
+    setSaveError("");
+
+    try {
+      await readResponse(
+        await apiFetch(`/workspaces/${selectedWorkspaceId}/saved-posts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ post_id: post.id }),
+        }),
+      );
+      setSaveMessage("Saved to workspace.");
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Failed to save post.",
+      );
+    } finally {
+      setIsSavingPost(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -147,6 +219,43 @@ export default function PublicPostPage() {
             {post.source_title && (
               <span>Based on source: {post.source_title}</span>
             )}
+          </div>
+          <div className={styles.savePanel}>
+            {session ? (
+              workspaces.length > 0 ? (
+                <>
+                  <label>
+                    Save this post to
+                    <select
+                      value={selectedWorkspaceId}
+                      onChange={(event) =>
+                        setSelectedWorkspaceId(event.target.value)
+                      }
+                      disabled={isSavingPost}
+                    >
+                      {workspaces.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                          {workspace.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void savePostToWorkspace()}
+                    disabled={isSavingPost || !selectedWorkspaceId}
+                  >
+                    {isSavingPost ? "Saving..." : "Save to workspace"}
+                  </button>
+                </>
+              ) : (
+                <p>Create a workspace before saving posts.</p>
+              )
+            ) : (
+              <Link href="/auth">Sign in to save this post</Link>
+            )}
+            {saveMessage && <p className={styles.saveSuccess}>{saveMessage}</p>}
+            {saveError && <p className={styles.saveError}>{saveError}</p>}
           </div>
         </header>
 

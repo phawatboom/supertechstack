@@ -3,13 +3,15 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from app.models.post import Post
+from app.models.post import Post, PostVersion, PublicationChunk
 from app.models.source import Source
 from app.schemas.post import PostStatus, PostVisibility
+from app.services.chunking import chunk_text
 from app.services.content_representations import (
     derive_plain_text,
     normalize_markdown_content,
 )
+from app.services.embeddings import create_embeddings
 
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
@@ -99,3 +101,79 @@ def create_post_from_source(
 def publish_post_if_needed(post: Post, status: PostStatus | None) -> None:
     if status == "published" and post.published_at is None:
         post.published_at = datetime.utcnow()
+
+
+def _latest_post_version(
+    database_session: Session,
+    post_id: int,
+) -> PostVersion | None:
+    return (
+        database_session.query(PostVersion)
+        .filter(PostVersion.post_id == post_id)
+        .order_by(PostVersion.version_number.desc())
+        .first()
+    )
+
+
+def _post_matches_version(post: Post, version: PostVersion) -> bool:
+    return (
+        post.title == version.title
+        and post.slug == version.slug
+        and post.markdown_content == version.markdown_content
+        and post.excerpt == version.excerpt
+        and post.cover_image_url == version.cover_image_url
+        and post.visibility == version.visibility
+    )
+
+
+def create_post_version_if_needed(
+    database_session: Session,
+    post: Post,
+) -> PostVersion | None:
+    if post.status != "published":
+        return None
+
+    if post.published_at is None:
+        post.published_at = datetime.utcnow()
+
+    latest_version = _latest_post_version(database_session, post.id)
+
+    if latest_version is not None and _post_matches_version(post, latest_version):
+        return latest_version
+
+    plain_text = derive_plain_text(post.markdown_content)
+    version = PostVersion(
+        post_id=post.id,
+        version_number=1 if latest_version is None else latest_version.version_number + 1,
+        author_id=post.author_id,
+        title=post.title,
+        slug=post.slug,
+        markdown_content=post.markdown_content,
+        plain_text=plain_text,
+        excerpt=post.excerpt,
+        cover_image_url=post.cover_image_url,
+        visibility=post.visibility,
+        published_at=post.published_at,
+    )
+    database_session.add(version)
+    database_session.flush()
+
+    chunk_contents = chunk_text(plain_text)
+    chunk_embeddings = create_embeddings(chunk_contents)
+
+    if len(chunk_embeddings) != len(chunk_contents):
+        raise RuntimeError("Failed to generate embeddings for all publication chunks")
+
+    database_session.add_all(
+        [
+            PublicationChunk(
+                post_version_id=version.id,
+                chunk_index=index,
+                content=chunk_content,
+                embedding=chunk_embeddings[index],
+            )
+            for index, chunk_content in enumerate(chunk_contents)
+        ]
+    )
+
+    return version
