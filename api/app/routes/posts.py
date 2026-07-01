@@ -283,6 +283,7 @@ def import_post_to_workspace(
         principal,
         database_session,
     )
+    create_post_version_if_needed(database_session, post)
     version = _latest_available_post_version(post.id, database_session)
     existing_import = database_session.get(
         WorkspacePostImport,

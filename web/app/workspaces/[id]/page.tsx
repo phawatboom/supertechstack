@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -68,6 +68,16 @@ type SavedPost = {
   status: Post["status"];
 };
 
+type ImportedPost = {
+  workspace_id: number;
+  post_version_id: number;
+  imported_by: string;
+  imported_at: string;
+  post_id: number;
+  version_number: number;
+  title: string;
+};
+
 type Chunk = {
   id: number;
   source_id: number;
@@ -80,6 +90,7 @@ type Chunk = {
 type Citation = {
   citation_number: number;
   chunk_id: number;
+  chunk_type: "source" | "imported_post";
   source_id: number;
   source_title: string;
   chunk_index: number;
@@ -89,6 +100,7 @@ type Citation = {
 
 type SearchResult = {
   chunk_id: number;
+  chunk_type: "source" | "imported_post";
   source_id: number;
   source_title: string;
   chunk_index: number;
@@ -264,6 +276,9 @@ export default function WorkspaceDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [sourceError, setSourceError] = useState("");
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+  const [importedPosts, setImportedPosts] = useState<ImportedPost[]>([]);
+  const [importingPostId, setImportingPostId] = useState<number | null>(null);
+  const [postImportError, setPostImportError] = useState("");
   const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
   const [sourceEditTitle, setSourceEditTitle] = useState("");
   const [savingSourceId, setSavingSourceId] = useState<number | null>(null);
@@ -318,6 +333,7 @@ export default function WorkspaceDetailPage() {
   const [sourceDetailMode, setSourceDetailMode] = useState<
     "preview" | "source"
   >("preview");
+  const searchableEvidenceCount = chunks.length + importedPosts.length;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const closeDetailButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -341,6 +357,7 @@ export default function WorkspaceDetailPage() {
         sourcesData,
         chunksData,
         savedPostsData: [] as SavedPost[],
+        importedPostsData: [] as ImportedPost[],
         postsData: [] as Post[],
         tracesData: [] as AnswerTraceSummary[],
         defaultsData: {
@@ -351,16 +368,29 @@ export default function WorkspaceDetailPage() {
       };
     }
 
-    const [savedPostsResponse, tracesResponse, defaultsResponse] =
+    const [
+      savedPostsResponse,
+      importedPostsResponse,
+      tracesResponse,
+      defaultsResponse,
+    ] =
       await Promise.all([
         apiFetch(`/workspaces/${workspaceId}/saved-posts`),
+        apiFetch(`/workspaces/${workspaceId}/post-imports`),
         apiFetch(`/workspaces/${workspaceId}/answer-traces`),
         apiFetch("/answer-settings/defaults"),
       ]);
-    const [postsResponse, savedPostsData, tracesData, defaultsData] =
+    const [
+      postsResponse,
+      savedPostsData,
+      importedPostsData,
+      tracesData,
+      defaultsData,
+    ] =
       await Promise.all([
         apiFetch(`/workspaces/${workspaceId}/posts`),
         readResponse<SavedPost[]>(savedPostsResponse),
+        readResponse<ImportedPost[]>(importedPostsResponse),
         readResponse<AnswerTraceSummary[]>(tracesResponse),
         readResponse<AnswerDefaults>(defaultsResponse),
       ]);
@@ -371,6 +401,7 @@ export default function WorkspaceDetailPage() {
       sourcesData,
       chunksData,
       savedPostsData,
+      importedPostsData,
       postsData,
       tracesData,
       defaultsData,
@@ -387,6 +418,7 @@ export default function WorkspaceDetailPage() {
           sourcesData,
           chunksData,
           savedPostsData,
+          importedPostsData,
           postsData,
           tracesData,
           defaultsData,
@@ -397,6 +429,7 @@ export default function WorkspaceDetailPage() {
           setWorkspaceDescription(workspaceData.description ?? "");
           setSources(sourcesData);
           setSavedPosts(savedPostsData);
+          setImportedPosts(importedPostsData);
           setPosts(postsData);
           setChunks(chunksData);
           setAnswerTraces(tracesData);
@@ -835,6 +868,8 @@ export default function WorkspaceDetailPage() {
       setRawText("");
       setSources(data.sourcesData);
       setChunks(data.chunksData);
+      setSavedPosts(data.savedPostsData);
+      setImportedPosts(data.importedPostsData);
       setPosts(data.postsData);
     } catch (error) {
       setSourceError(
@@ -886,6 +921,8 @@ export default function WorkspaceDetailPage() {
       setSelectedFile(null);
       setSources(data.sourcesData);
       setChunks(data.chunksData);
+      setSavedPosts(data.savedPostsData);
+      setImportedPosts(data.importedPostsData);
       setPosts(data.postsData);
 
       if (fileInputRef.current) {
@@ -897,6 +934,40 @@ export default function WorkspaceDetailPage() {
       );
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function importSavedPostForRag(savedPost: SavedPost) {
+    setImportingPostId(savedPost.post_id);
+    setPostImportError("");
+
+    try {
+      const response = await apiFetch(`/workspaces/${workspaceId}/post-imports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ post_id: savedPost.post_id }),
+      });
+      const importedPost = await readResponse<ImportedPost>(response);
+
+      setImportedPosts((current) => {
+        if (
+          current.some(
+            (item) => item.post_version_id === importedPost.post_version_id,
+          )
+        ) {
+          return current;
+        }
+
+        return [importedPost, ...current];
+      });
+    } catch (error) {
+      setPostImportError(
+        error instanceof Error
+          ? error.message
+          : "Failed to import post for RAG.",
+      );
+    } finally {
+      setImportingPostId(null);
     }
   }
 
@@ -996,7 +1067,7 @@ export default function WorkspaceDetailPage() {
   if (isPageLoading) {
     return (
       <main className={styles.shell}>
-        <div className={styles.loadingCard}>Loading workspace…</div>
+        <div className={styles.loadingCard}>Loading workspaceâ€¦</div>
       </main>
     );
   }
@@ -1123,7 +1194,7 @@ export default function WorkspaceDetailPage() {
                   retrieval requests and one capped AI answer per day.
                 </p>
               </div>
-              <Link href="/auth">Create a private workspace →</Link>
+              <Link href="/auth">Create a private workspace â†’</Link>
             </section>
           )}
 
@@ -1313,7 +1384,7 @@ export default function WorkspaceDetailPage() {
                 <p className={styles.step}>Step 1</p>
                 <h2>Upload a document</h2>
               </div>
-              <span className={styles.badge}>PDF · DOCX · Text</span>
+              <span className={styles.badge}>PDF Â· DOCX Â· Text</span>
             </div>
 
             <p className={styles.sectionCopy}>
@@ -1340,13 +1411,13 @@ export default function WorkspaceDetailPage() {
 
               <label className={styles.filePicker}>
                 <span className={styles.filePickerIcon} aria-hidden="true">
-                  ↑
+                  â†‘
                 </span>
                 <strong>
                   {selectedFile ? "Choose a different file" : "Choose a document"}
                 </strong>
                 <small>
-                  PDF, DOCX, TXT, MD, or TEX · maximum{" "}
+                  PDF, DOCX, TXT, MD, or TEX Â· maximum{" "}
                   {formatFileSize(maxUploadSize)}
                 </small>
                 <input
@@ -1396,7 +1467,7 @@ export default function WorkspaceDetailPage() {
                   type="submit"
                   disabled={isUploading || !selectedFile}
                 >
-                  {isUploading ? "Uploading document…" : "Upload document"}
+                  {isUploading ? "Uploading documentâ€¦" : "Upload document"}
                 </button>
               </div>
             </form>
@@ -1438,7 +1509,7 @@ export default function WorkspaceDetailPage() {
                   onPaste={(event) =>
                     insertCleanPastedText(event, rawText, setRawText)
                   }
-                  placeholder="Paste source text here…"
+                  placeholder="Paste source text hereâ€¦"
                   rows={9}
                   disabled={isSaving}
                 />
@@ -1453,7 +1524,7 @@ export default function WorkspaceDetailPage() {
               <div className={styles.formFooter}>
                 <span>{rawText.trim().length.toLocaleString()} characters</span>
                 <button type="submit" disabled={isSaving}>
-                  {isSaving ? "Processing source…" : "Save source"}
+                  {isSaving ? "Processing sourceâ€¦" : "Save source"}
                 </button>
               </div>
             </form>
@@ -1482,14 +1553,14 @@ export default function WorkspaceDetailPage() {
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="e.g. database connection pooling"
-                  disabled={isSearching || chunks.length === 0}
+                  disabled={isSearching || searchableEvidenceCount === 0}
                   maxLength={20000}
                 />
               </label>
 
-              {chunks.length === 0 && (
+              {searchableEvidenceCount === 0 && (
                 <p className={styles.hint}>
-                  Save at least one source before searching.
+                  Save or import at least one source before searching.
                 </p>
               )}
 
@@ -1503,9 +1574,9 @@ export default function WorkspaceDetailPage() {
                 <span>Returns up to 10 matching passages</span>
                 <button
                   type="submit"
-                  disabled={isSearching || chunks.length === 0}
+                  disabled={isSearching || searchableEvidenceCount === 0}
                 >
-                  {isSearching ? "Searching…" : "Search sources"}
+                  {isSearching ? "Searchingâ€¦" : "Search sources"}
                 </button>
               </div>
             </form>
@@ -1527,13 +1598,14 @@ export default function WorkspaceDetailPage() {
                 ) : (
                   <div className={styles.searchResultList}>
                     {searchResults.map((result) => {
-                      const chunk = chunks.find(
-                        (item) => item.id === result.chunk_id,
-                      );
+                      const chunk =
+                        result.chunk_type === "source"
+                          ? chunks.find((item) => item.id === result.chunk_id)
+                          : undefined;
 
                       return (
                         <article
-                          key={result.chunk_id}
+                          key={`${result.chunk_type}-${result.chunk_id}`}
                           className={styles.searchResult}
                         >
                           <div className={styles.searchResultMeta}>
@@ -1593,7 +1665,7 @@ export default function WorkspaceDetailPage() {
                   onChange={(event) => setAnswerQuery(event.target.value)}
                   placeholder="What are the main findings across these sources?"
                   rows={4}
-                  disabled={isAnswering || chunks.length === 0}
+                  disabled={isAnswering || searchableEvidenceCount === 0}
                 />
               </label>
 
@@ -1605,7 +1677,7 @@ export default function WorkspaceDetailPage() {
                       Model, retrieval, instructions, and rendered input
                     </small>
                   </span>
-                  <span aria-hidden="true">⌄</span>
+                  <span aria-hidden="true">âŒ„</span>
                 </summary>
 
                 <div className={styles.advancedSettingsBody}>
@@ -1713,9 +1785,9 @@ export default function WorkspaceDetailPage() {
                 </div>
               </details>}
 
-              {chunks.length === 0 && (
+              {searchableEvidenceCount === 0 && (
                 <p className={styles.hint}>
-                  Save at least one source before asking a question.
+                  Save or import at least one source before asking a question.
                 </p>
               )}
 
@@ -1735,9 +1807,9 @@ export default function WorkspaceDetailPage() {
                 </span>
                 <button
                   type="submit"
-                  disabled={isAnswering || chunks.length === 0}
+                  disabled={isAnswering || searchableEvidenceCount === 0}
                 >
-                  {isAnswering ? "Generating answer…" : "Generate answer"}
+                  {isAnswering ? "Generating answerâ€¦" : "Generate answer"}
                 </button>
               </div>
             </form>
@@ -1828,7 +1900,7 @@ export default function WorkspaceDetailPage() {
                     </span>
                     <span className={styles.traceQuery}>{trace.query}</span>
                     <span className={styles.traceTiming}>
-                      {trace.total_ms !== null ? `${trace.total_ms} ms` : "—"}
+                      {trace.total_ms !== null ? `${trace.total_ms} ms` : "â€”"}
                     </span>
                     <time dateTime={trace.created_at}>
                       {formatDate(trace.created_at)}
@@ -1839,7 +1911,7 @@ export default function WorkspaceDetailPage() {
             )}
 
             {isLoadingTrace && (
-              <p className={styles.traceLoading}>Loading trace…</p>
+              <p className={styles.traceLoading}>Loading traceâ€¦</p>
             )}
 
             {selectedTrace && !isLoadingTrace && (
@@ -1860,19 +1932,19 @@ export default function WorkspaceDetailPage() {
                 <div className={styles.traceMetrics}>
                   <div>
                     <span>Retrieval</span>
-                    <strong>{selectedTrace.retrieval_ms ?? "—"} ms</strong>
+                    <strong>{selectedTrace.retrieval_ms ?? "â€”"} ms</strong>
                   </div>
                   <div>
                     <span>Generation</span>
-                    <strong>{selectedTrace.generation_ms ?? "—"} ms</strong>
+                    <strong>{selectedTrace.generation_ms ?? "â€”"} ms</strong>
                   </div>
                   <div>
                     <span>Total</span>
-                    <strong>{selectedTrace.total_ms ?? "—"} ms</strong>
+                    <strong>{selectedTrace.total_ms ?? "â€”"} ms</strong>
                   </div>
                   <div>
                     <span>Tokens</span>
-                    <strong>{selectedTrace.total_tokens ?? "—"}</strong>
+                    <strong>{selectedTrace.total_tokens ?? "â€”"}</strong>
                   </div>
                 </div>
 
@@ -1915,7 +1987,7 @@ export default function WorkspaceDetailPage() {
 
             {sources.length === 0 ? (
               <div className={styles.emptyState}>
-                <span aria-hidden="true">＋</span>
+                <span aria-hidden="true">ï¼‹</span>
                 <p>No uploaded sources yet</p>
                 <small>
                   Upload or import content to make it searchable in this
@@ -1996,7 +2068,7 @@ export default function WorkspaceDetailPage() {
                     )}
                     <p>
                       {sourceText.slice(0, 150)}
-                      {source.raw_text.length > 150 ? "…" : ""}
+                      {source.raw_text.length > 150 ? "â€¦" : ""}
                     </p>
                     <div className={styles.sourceActions}>
                       <button
@@ -2098,47 +2170,110 @@ export default function WorkspaceDetailPage() {
                   <span>{savedPosts.length}</span>
                 </div>
                 <div className={styles.savedReferencesList}>
-                  {savedPosts.map((savedPost) => (
-                    <article
-                      key={savedPost.post_id}
-                      className={styles.savedReferenceItem}
-                    >
-                      <div className={styles.itemMeta}>
-                        <span>{savedPost.status}</span>
-                        <time dateTime={savedPost.created_at}>
-                          {formatDate(savedPost.created_at)}
-                        </time>
-                      </div>
-                      <Link href={`/posts/${savedPost.post_id}`}>
-                        {savedPost.title}
-                      </Link>
-                      <p>
-                        Saved post reference. Importing for RAG can be added as
-                        the next step.
-                      </p>
-                    </article>
-                  ))}
+                  {savedPosts.map((savedPost) => {
+                    const importedPost = importedPosts.find(
+                      (item) => item.post_id === savedPost.post_id,
+                    );
+                    const isImporting = importingPostId === savedPost.post_id;
+
+                    return (
+                      <article
+                        key={savedPost.post_id}
+                        className={styles.savedReferenceItem}
+                      >
+                        <div className={styles.itemMeta}>
+                          <span>{savedPost.status}</span>
+                          <time dateTime={savedPost.created_at}>
+                            {formatDate(savedPost.created_at)}
+                          </time>
+                          {importedPost && (
+                            <span className={styles.postStatus}>
+                              imported
+                            </span>
+                          )}
+                        </div>
+                        <Link href={`/posts/${savedPost.post_id}`}>
+                          {savedPost.title}
+                        </Link>
+                        <p>
+                          {importedPost
+                            ? `Searchable from version ${importedPost.version_number}.`
+                            : "Saved reference only. Import it to search and ask questions over this post."}
+                        </p>
+                        <div className={styles.sourceActions}>
+                          <Link
+                            href={`/posts/${savedPost.post_id}`}
+                            className={styles.secondaryTextButton}
+                          >
+                            Open post
+                          </Link>
+                          {!importedPost && (
+                            <button
+                              type="button"
+                              className={styles.primaryTextButton}
+                              onClick={() =>
+                                void importSavedPostForRag(savedPost)
+                              }
+                              disabled={isImporting}
+                            >
+                              {isImporting ? "Importing..." : "Import for RAG"}
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
+                {postImportError && (
+                  <p className={styles.error} role="alert">
+                    {postImportError}
+                  </p>
+                )}
               </div>
             )}
           </section>
 
           <section className={styles.card}>
             <div className={styles.sectionHeading}>
-              <h2>Indexed chunks</h2>
-              <span className={styles.count}>{chunks.length}</span>
+              <h2>Searchable evidence</h2>
+              <span className={styles.count}>{searchableEvidenceCount}</span>
             </div>
 
-            {chunks.length === 0 ? (
+            {searchableEvidenceCount === 0 ? (
               <div className={styles.emptyState}>
-                <span aria-hidden="true">⌁</span>
+                <span aria-hidden="true">?</span>
                 <p>Nothing indexed yet</p>
-                <small>Chunks are created when you save a source.</small>
+                <small>
+                  Chunks are created when you save a source or import a post for
+                  RAG.
+                </small>
               </div>
             ) : (
               <div className={`${styles.list} ${styles.chunkList}`}>
+                {importedPosts.map((importedPost) => (
+                  <article
+                    key={`imported-${importedPost.post_version_id}`}
+                    className={styles.chunkItem}
+                  >
+                    <span>
+                      Imported post · Version {importedPost.version_number}
+                    </span>
+                    <p>{importedPost.title}</p>
+                    <Link
+                      href={`/posts/${importedPost.post_id}`}
+                      className={styles.viewButton}
+                    >
+                      Open original post
+                      <ArrowRight
+                        aria-hidden="true"
+                        className={styles.arrowRight}
+                        size={14}
+                      />
+                    </Link>
+                  </article>
+                ))}
                 {chunks.map((chunk) => (
-                  <article key={chunk.id} className={styles.chunkItem}>
+                  <article key={`source-${chunk.id}`} className={styles.chunkItem}>
                     <span>
                       Source {chunk.source_id} · Chunk {chunk.chunk_index + 1}
                     </span>
@@ -2191,7 +2326,7 @@ export default function WorkspaceDetailPage() {
                 <h2 id="detail-title">
                   {detailView.kind === "source"
                     ? detailView.item.title
-                    : `${sourceTitleForChunk(detailView.item)} · Chunk ${
+                    : `${sourceTitleForChunk(detailView.item)} Â· Chunk ${
                         detailView.item.chunk_index + 1
                       }`}
                 </h2>
@@ -2232,7 +2367,7 @@ export default function WorkspaceDetailPage() {
                 aria-label="Close full content view"
                 onClick={() => setDetailView(null)}
               >
-                ×
+                Ã—
               </button>
             </header>
 
@@ -2298,3 +2433,4 @@ export default function WorkspaceDetailPage() {
     </main>
   );
 }
+

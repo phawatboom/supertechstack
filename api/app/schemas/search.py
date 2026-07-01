@@ -22,6 +22,7 @@ class SearchRequest(BaseModel):
 
 class SearchResultResponse(BaseModel):
     chunk_id: int
+    chunk_type: str = "source"
     source_id: int
     source_title: str
     chunk_index: int

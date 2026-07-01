@@ -61,6 +61,7 @@ def search_workspace(
     return [
         SearchResultResponse(
             chunk_id=chunk.chunk_id,
+            chunk_type=chunk.chunk_type,
             source_id=chunk.source_id,
             source_title=chunk.source_title,
             chunk_index=chunk.chunk_index,
