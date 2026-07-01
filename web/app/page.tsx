@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   type FormEvent,
@@ -397,9 +396,6 @@ export default function HomePage() {
         className={`${styles.header} ${session ? styles.dashboardHeader : ""}`}
       >
         <Link href="/" className={styles.brand} aria-label="InsightOS home">
-          <span className={styles.logoMark} aria-hidden="true">
-            I
-          </span>
           <span>Supertechstack</span>
         </Link>
 
@@ -423,35 +419,12 @@ export default function HomePage() {
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>Your research, organized</p>
-            <h1>Turn scattered sources into clear, grounded insights.</h1>
-            <p className={styles.heroDescription}>
-              Build focused workspaces, organise your sources, and generate
-              evidence-backed answers.
-            </p>
 
-            <div className={styles.featureList}>
-              <span>
-                <i aria-hidden="true">&#10003;</i> Semantic search
-              </span>
-              <span>
-                <i aria-hidden="true">&#10003;</i> Grounded answers
-              </span>
-              <span>
-                <i aria-hidden="true">&#10003;</i> Saved reports
-              </span>
-            </div>
-            <div className={styles.heroActions}>
-              <Link href="/demo" className={styles.primaryAction}>
-                <span>Explore demo workspace</span>
-                <ArrowRight
-                  aria-hidden="true"
-                  className={styles.arrowRight}
-                  size={14}
-                />
-              </Link>
-              <Link href="/auth?mode=sign-up" className={styles.secondaryAction}>
-                Create an account
-              </Link>
+            <div className={styles.heroVisual} aria-hidden="true">
+              <img
+                src="https://images.phawats.com/homepage_workflow_interface_design_3.png"
+                alt=""
+              />
             </div>
           </div>
 
