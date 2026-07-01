@@ -526,7 +526,7 @@ export default function HomePage() {
         <section className={styles.feedSection}>
           <div className={styles.sectionHeader}>
             <div>
-              <p className={styles.eyebrow}>Private feed</p>
+              <p className={styles.eyebrow}>Private</p>
             </div>
           </div>
 
@@ -576,7 +576,7 @@ export default function HomePage() {
       <section className={styles.feedSection}>
         <div className={styles.sectionHeader}>
           <div>
-            <p className={styles.eyebrow}>Public feed</p>
+            <p className={styles.eyebrow}>Public</p>
           </div>
         </div>
 
