@@ -89,6 +89,7 @@ export default function PublicPostPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+  const canEditPost = Boolean(session?.user.id && post?.author_id === session.user.id);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,6 +232,14 @@ export default function PublicPostPage() {
             <span>Read-only post</span>
             {post.source_title && (
               <span>Based on source: {post.source_title}</span>
+            )}
+            {canEditPost && (
+              <Link
+                href={`/workspaces/${post.workspace_id}`}
+                className={styles.editPostLink}
+              >
+                Edit in workspace
+              </Link>
             )}
           </div>
           <div className={styles.savePanel}>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -12,7 +12,6 @@ import {
 } from "react";
 import { useAuth } from "./components/auth-provider";
 import { apiFetch } from "./lib/api";
-import { cleanCopiedText } from "./lib/text-cleanup";
 import {
   clearPendingWorkspace,
   readPendingWorkspace,
@@ -46,12 +45,33 @@ type PublicFeedPost = {
   workspace_name: string;
 };
 
-const workspaceMarks = [
-  styles.mark1,
-  styles.mark2,
-  styles.mark3,
-  styles.mark4,
-];
+type DashboardPost = PublicFeedPost;
+
+function getDashboardPostKey(post: DashboardPost) {
+  if (post.source_id !== null) {
+    return `${post.workspace_id}:source:${post.source_id}`;
+  }
+
+  return `${post.workspace_id}:title:${post.title.trim().toLowerCase()}`;
+}
+
+function dedupeDashboardPosts(posts: DashboardPost[]) {
+  const postsByKey = new Map<string, DashboardPost>();
+
+  for (const post of posts) {
+    const key = getDashboardPostKey(post);
+    const current = postsByKey.get(key);
+
+    if (
+      !current ||
+      new Date(post.updated_at).getTime() > new Date(current.updated_at).getTime()
+    ) {
+      postsByKey.set(key, post);
+    }
+  }
+
+  return Array.from(postsByKey.values());
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -60,6 +80,13 @@ function formatDate(value: string) {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function formatDisplayLabel(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\b[\p{L}\p{N}]/gu, (character) => character.toUpperCase());
 }
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -85,6 +112,10 @@ export default function HomePage() {
   const [feedPosts, setFeedPosts] = useState<PublicFeedPost[]>([]);
   const [isFeedLoading, setIsFeedLoading] = useState(true);
   const [feedError, setFeedError] = useState("");
+  const [privatePosts, setPrivatePosts] = useState<DashboardPost[]>([]);
+  const [isPrivatePostsLoading, setIsPrivatePostsLoading] = useState(false);
+  const [privatePostsError, setPrivatePostsError] = useState("");
+  const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
 
   const fetchWorkspaces = useCallback(async () => {
     const response = await apiFetch("/workspaces");
@@ -248,6 +279,8 @@ export default function HomePage() {
       setWorkspaceName("");
       setWorkspaceDescription("");
       setWorkspaces((current) => [workspace, ...current]);
+      setIsCreateWorkspaceOpen(false);
+      router.push(`/workspaces/${workspace.id}`);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -259,9 +292,110 @@ export default function HomePage() {
     }
   }
 
+  useEffect(() => {
+    if (!session || workspaces.length === 0) {
+      setPrivatePosts([]);
+      setIsPrivatePostsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPrivatePostsLoading(true);
+    setPrivatePostsError("");
+
+    void Promise.all(
+      workspaces.map(async (workspace) => {
+        const response = await apiFetch(`/workspaces/${workspace.id}/posts`);
+        const posts = await readResponse<Omit<DashboardPost, "workspace_name">[]>(
+          response,
+        );
+
+        return posts.map((post) => ({
+          ...post,
+          workspace_name: workspace.name,
+        }));
+      }),
+    )
+      .then((groups) => {
+        if (cancelled) {
+          return;
+        }
+
+        setPrivatePosts(
+          dedupeDashboardPosts(
+            groups.flat().filter((post) => post.visibility !== "public"),
+          )
+            .sort(
+              (left, right) =>
+                new Date(right.updated_at).getTime() -
+                new Date(left.updated_at).getTime(),
+            )
+            .slice(0, 8),
+        );
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setPrivatePostsError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load private posts.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsPrivatePostsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, workspaces]);
+
+  const createWorkspaceForm = (
+    <form onSubmit={createWorkspace} className={styles.form}>
+      <label>
+        Workspace name
+        <input
+          value={workspaceName}
+          onChange={(event) => setWorkspaceName(event.target.value)}
+          placeholder="e.g. AI industry research"
+          disabled={isCreating}
+          maxLength={120}
+          autoComplete="off"
+        />
+      </label>
+
+      <label>
+        Description <span>Optional</span>
+        <textarea
+          value={workspaceDescription}
+          onChange={(event) => setWorkspaceDescription(event.target.value)}
+          placeholder="What are you researching?"
+          rows={3}
+          disabled={isCreating}
+          maxLength={500}
+        />
+      </label>
+
+      {errorMessage && (
+        <p className={styles.error} role="alert">
+          {errorMessage}
+        </p>
+      )}
+
+      <button type="submit" disabled={isCreating}>
+        {isCreating ? "Creating workspace..." : "Create workspace"}
+      </button>
+    </form>
+  );
+
   return (
     <main className={styles.shell}>
-      <header className={styles.header}>
+      <header
+        className={`${styles.header} ${session ? styles.dashboardHeader : ""}`}
+      >
         <Link href="/" className={styles.brand} aria-label="InsightOS home">
           <span className={styles.logoMark} aria-hidden="true">
             I
@@ -285,104 +419,164 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className={styles.hero}>
-        <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}>Your research, organized</p>
-          <h1>Turn scattered sources into clear, grounded insights.</h1>
-          <p className={styles.heroDescription}>
-            Build focused workspaces, organise your sources, and generate
-            evidence-backed answers.
-          </p>
+      {!session && (
+        <section className={styles.hero}>
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}>Your research, organized</p>
+            <h1>Turn scattered sources into clear, grounded insights.</h1>
+            <p className={styles.heroDescription}>
+              Build focused workspaces, organise your sources, and generate
+              evidence-backed answers.
+            </p>
 
-          <div className={styles.featureList}>
-            <span>
-              <i aria-hidden="true">✓</i> Semantic search
-            </span>
-            <span>
-              <i aria-hidden="true">✓</i> Grounded answers
-            </span>
-            <span>
-              <i aria-hidden="true">✓</i> Saved reports
-            </span>
-          </div>
-          <div className={styles.heroActions}>
-            <Link href="/demo" className={styles.primaryAction}>
-              <span>Explore demo workspace</span>
-              <ArrowRight
-                aria-hidden="true"
-                className={styles.arrowRight}
-                size={14}
-              />
-            </Link>
-            {!session && (
+            <div className={styles.featureList}>
+              <span>
+                <i aria-hidden="true">&#10003;</i> Semantic search
+              </span>
+              <span>
+                <i aria-hidden="true">&#10003;</i> Grounded answers
+              </span>
+              <span>
+                <i aria-hidden="true">&#10003;</i> Saved reports
+              </span>
+            </div>
+            <div className={styles.heroActions}>
+              <Link href="/demo" className={styles.primaryAction}>
+                <span>Explore demo workspace</span>
+                <ArrowRight
+                  aria-hidden="true"
+                  className={styles.arrowRight}
+                  size={14}
+                />
+              </Link>
               <Link href="/auth?mode=sign-up" className={styles.secondaryAction}>
                 Create an account
               </Link>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.createCard}>
-          <div className={styles.cardHeader}>
-            <div>
-              <p className={styles.step}>Get started</p>
-              <h2>Create a workspace</h2>
             </div>
-            <span className={styles.cardIcon} aria-hidden="true">
-              +
-            </span>
           </div>
 
-          <p className={styles.cardDescription}>
-            Give your research a clear scope. You can add and index sources
-            after creating it.
-          </p>
+          <div className={styles.createCard}>
+            <div className={styles.cardHeader}>
+              <div>
+                <p className={styles.step}>Get started</p>
+                <h2>Create a workspace</h2>
+              </div>
+            </div>
 
-          <form onSubmit={createWorkspace} className={styles.form}>
-            <label>
-              Workspace name
-              <input
-                value={workspaceName}
-                onChange={(event) => setWorkspaceName(event.target.value)}
-                placeholder="e.g. AI full-stack job research"
-                disabled={isCreating}
-                maxLength={120}
-                autoComplete="off"
-              />
-            </label>
+            <p className={styles.cardDescription}>
+              Give your research a clear scope. You can add and index sources
+              after creating it.
+            </p>
 
-            <label>
-              Description <span>Optional</span>
-              <textarea
-                value={workspaceDescription}
-                onChange={(event) =>
-                  setWorkspaceDescription(event.target.value)
-                }
-                placeholder="What are you researching?"
-                rows={4}
-                disabled={isCreating}
-                maxLength={500}
-              />
-            </label>
+            {createWorkspaceForm}
+          </div>
+        </section>
+      )}
 
-            {errorMessage && (
-              <p className={styles.error} role="alert">
-                {errorMessage}
-              </p>
-            )}
+      {session && (
+        <section className={styles.workspaceSection}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.eyebrow}>Library</p>
+            </div>
+          </div>
 
-            <button type="submit" disabled={isCreating}>
-              {isCreating ? "Creating workspace…" : "Create workspace"}
-            </button>
-          </form>
-        </div>
-      </section>
+          {isLoading ? (
+            <div className={styles.loadingGrid} aria-label="Loading workspaces">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className={styles.skeleton} />
+              ))}
+            </div>
+          ) : workspaces.length === 0 ? (
+            <div className={styles.emptyState}>
+              <span aria-hidden="true">&#9671;</span>
+              <h3>No workspaces yet</h3>
+              <p>Create your first workspace to begin organizing research.</p>
+              <button
+                type="button"
+                className={styles.emptyStateAction}
+                onClick={() => setIsCreateWorkspaceOpen(true)}
+              >
+                New workspace
+              </button>
+            </div>
+          ) : (
+            <div className={styles.workspaceGrid}>
+              {workspaces.map((workspace) => (
+                <Link
+                  key={workspace.id}
+                  href={`/workspaces/${workspace.id}`}
+                  className={styles.workspaceCard}
+                >
+                  <div>
+                    <h3>{workspace.name}</h3>
+                  </div>
+
+                  <div className={styles.workspaceMeta}>
+                    <span>{formatDate(workspace.created_at)}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {session && (
+        <section className={styles.feedSection}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.eyebrow}>Private feed</p>
+            </div>
+          </div>
+
+          {isPrivatePostsLoading ? (
+            <div
+              className={styles.loadingGrid}
+              aria-label="Loading private posts"
+            >
+              {[1, 2, 3].map((item) => (
+                <div key={item} className={styles.skeleton} />
+              ))}
+            </div>
+          ) : privatePostsError ? (
+            <p className={styles.error} role="alert">
+              {privatePostsError}
+            </p>
+          ) : privatePosts.length === 0 ? (
+            <div className={styles.emptyState}>
+              <span aria-hidden="true">&#9671;</span>
+              <h3>No private posts yet</h3>
+              <p>Drafts and private workspace posts will appear here.</p>
+            </div>
+          ) : (
+            <div className={styles.feedGrid}>
+              {privatePosts.map((post) => (
+                <Link
+                  key={post.id}
+                  href={`/posts/${post.id}`}
+                  className={styles.feedCard}
+                >
+                  <div>
+                    <div className={styles.feedMeta}>
+                      <span>{formatDisplayLabel(post.workspace_name)}</span>
+                      <time dateTime={post.updated_at}>
+                        {formatDate(post.updated_at)}
+                      </time>
+                    </div>
+                    <h3>{post.title}</h3>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className={styles.feedSection}>
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.eyebrow}>Public feed</p>
-            <h2>Published workspace posts</h2>
           </div>
         </div>
 
@@ -398,97 +592,72 @@ export default function HomePage() {
           </p>
         ) : feedPosts.length === 0 ? (
           <div className={styles.emptyState}>
-            <span aria-hidden="true">◇</span>
+            <span aria-hidden="true">&#9671;</span>
             <h3>No public posts yet</h3>
             <p>Published posts marked public will appear here.</p>
           </div>
         ) : (
           <div className={styles.feedGrid}>
             {feedPosts.map((post) => (
-              <article key={post.id} className={styles.feedCard}>
+              <Link
+                key={post.id}
+                href={`/posts/${post.id}`}
+                className={styles.feedCard}
+              >
                 <div>
                   <div className={styles.feedMeta}>
-                    <span>{post.workspace_name}</span>
+                    <span>{formatDisplayLabel(post.workspace_name)}</span>
                     <time dateTime={post.published_at ?? post.created_at}>
                       {formatDate(post.published_at ?? post.created_at)}
                     </time>
                   </div>
                   <h3>{post.title}</h3>
-                  <p>
-                    {post.excerpt
-                      ? cleanCopiedText(post.excerpt)
-                      : cleanCopiedText(post.markdown_content).slice(0, 220)}
-                  </p>
-                </div>
-                <Link href={`/posts/${post.id}`}>Read post</Link>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {session && <section className={styles.workspaceSection}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <p className={styles.eyebrow}>Library</p>
-            <h2>Your workspaces</h2>
-          </div>
-          <span className={styles.workspaceCount}>
-            {workspaces.length} {workspaces.length === 1 ? "workspace" : "workspaces"}
-          </span>
-        </div>
-
-        {isLoading ? (
-          <div className={styles.loadingGrid} aria-label="Loading workspaces">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className={styles.skeleton} />
-            ))}
-          </div>
-        ) : workspaces.length === 0 ? (
-          <div className={styles.emptyState}>
-            <span aria-hidden="true">◇</span>
-            <h3>No workspaces yet</h3>
-            <p>Create your first workspace above to begin organizing research.</p>
-          </div>
-        ) : (
-          <div className={styles.workspaceGrid}>
-            {workspaces.map((workspace, index) => (
-              <Link
-                key={workspace.id}
-                href={`/workspaces/${workspace.id}`}
-                className={styles.workspaceCard}
-              >
-                <div className={styles.workspaceCardTop}>
-                  <span
-                    className={`${styles.workspaceMark} ${
-                      workspaceMarks[index % workspaceMarks.length]
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {workspace.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className={styles.openIcon} aria-hidden="true">
-                    ↗
-                  </span>
-                </div>
-
-                <div>
-                  <h3>{workspace.name}</h3>
-                  <p>
-                    {workspace.description ||
-                      "Add sources and ask grounded questions in this workspace."}
-                  </p>
-                </div>
-
-                <div className={styles.workspaceMeta}>
-                  <span>Created {formatDate(workspace.created_at)}</span>
-                  <strong>Open workspace</strong>
                 </div>
               </Link>
             ))}
           </div>
         )}
-      </section>}
+      </section>
+
+      {isCreateWorkspaceOpen && (
+        <div
+          className={styles.modalBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isCreating) {
+              setIsCreateWorkspaceOpen(false);
+            }
+          }}
+        >
+          <section
+            className={styles.modalPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-workspace-title"
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <p className={styles.step}>New workspace</p>
+                <h2 id="create-workspace-title">Create a workspace</h2>
+              </div>
+              <button
+                type="button"
+                className={styles.closeModalButton}
+                onClick={() => setIsCreateWorkspaceOpen(false)}
+                disabled={isCreating}
+                aria-label="Close create workspace dialog"
+              >
+                &times;
+              </button>
+            </div>
+            <p className={styles.cardDescription}>
+              Give your research a clear scope. You can add sources after
+              creating it.
+            </p>
+            {createWorkspaceForm}
+          </section>
+        </div>
+      )}
     </main>
   );
 }

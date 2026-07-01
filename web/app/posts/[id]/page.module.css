@@ -98,6 +98,23 @@
   background: #fbfcfe;
 }
 
+.editPostLink {
+  padding: 6px 10px;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: none;
+}
+
+.editPostLink:hover {
+  border-color: #a5b4fc;
+  background: #e0e7ff;
+}
+
 .savePanel {
   display: flex;
   gap: 10px;

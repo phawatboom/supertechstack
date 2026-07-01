@@ -1067,7 +1067,7 @@ export default function WorkspaceDetailPage() {
   if (isPageLoading) {
     return (
       <main className={styles.shell}>
-        <div className={styles.loadingCard}>Loading workspaceâ€¦</div>
+        <div className={styles.loadingCard}>Loading workspace...</div>
       </main>
     );
   }
@@ -1153,10 +1153,9 @@ export default function WorkspaceDetailPage() {
             <>
               <p className={styles.eyebrow}>Research workspace</p>
               <h1>{workspace?.name ?? `Workspace ${workspaceId}`}</h1>
-              <p className={styles.description}>
-                {workspace?.description ||
-                  "Add source material, inspect retrieved chunks, and ask grounded questions."}
-              </p>
+              {workspace?.description && (
+                <p className={styles.description}>{workspace.description}</p>
+              )}
               {!demoMode && (
                 <button
                   type="button"
@@ -1194,7 +1193,7 @@ export default function WorkspaceDetailPage() {
                   retrieval requests and one capped AI answer per day.
                 </p>
               </div>
-              <Link href="/auth">Create a private workspace â†’</Link>
+              <Link href="/auth">Create a private workspace &rarr;</Link>
             </section>
           )}
 
@@ -1384,7 +1383,7 @@ export default function WorkspaceDetailPage() {
                 <p className={styles.step}>Step 1</p>
                 <h2>Upload a document</h2>
               </div>
-              <span className={styles.badge}>PDF Â· DOCX Â· Text</span>
+              <span className={styles.badge}>PDF &middot; DOCX &middot; Text</span>
             </div>
 
             <p className={styles.sectionCopy}>
@@ -1411,13 +1410,13 @@ export default function WorkspaceDetailPage() {
 
               <label className={styles.filePicker}>
                 <span className={styles.filePickerIcon} aria-hidden="true">
-                  â†‘
+                  &#8593;
                 </span>
                 <strong>
                   {selectedFile ? "Choose a different file" : "Choose a document"}
                 </strong>
                 <small>
-                  PDF, DOCX, TXT, MD, or TEX Â· maximum{" "}
+                  PDF, DOCX, TXT, MD, or TEX - maximum{" "}
                   {formatFileSize(maxUploadSize)}
                 </small>
                 <input
@@ -1467,7 +1466,7 @@ export default function WorkspaceDetailPage() {
                   type="submit"
                   disabled={isUploading || !selectedFile}
                 >
-                  {isUploading ? "Uploading documentâ€¦" : "Upload document"}
+                  {isUploading ? "Uploading document..." : "Upload document"}
                 </button>
               </div>
             </form>
@@ -1509,7 +1508,7 @@ export default function WorkspaceDetailPage() {
                   onPaste={(event) =>
                     insertCleanPastedText(event, rawText, setRawText)
                   }
-                  placeholder="Paste source text hereâ€¦"
+                  placeholder="Paste source text here..."
                   rows={9}
                   disabled={isSaving}
                 />
@@ -1524,7 +1523,7 @@ export default function WorkspaceDetailPage() {
               <div className={styles.formFooter}>
                 <span>{rawText.trim().length.toLocaleString()} characters</span>
                 <button type="submit" disabled={isSaving}>
-                  {isSaving ? "Processing sourceâ€¦" : "Save source"}
+                  {isSaving ? "Processing source..." : "Save source"}
                 </button>
               </div>
             </form>
@@ -1576,7 +1575,7 @@ export default function WorkspaceDetailPage() {
                   type="submit"
                   disabled={isSearching || searchableEvidenceCount === 0}
                 >
-                  {isSearching ? "Searchingâ€¦" : "Search sources"}
+                  {isSearching ? "Searching..." : "Search sources"}
                 </button>
               </div>
             </form>
@@ -1677,7 +1676,7 @@ export default function WorkspaceDetailPage() {
                       Model, retrieval, instructions, and rendered input
                     </small>
                   </span>
-                  <span aria-hidden="true">âŒ„</span>
+                  <span aria-hidden="true">&#8964;</span>
                 </summary>
 
                 <div className={styles.advancedSettingsBody}>
@@ -1809,7 +1808,7 @@ export default function WorkspaceDetailPage() {
                   type="submit"
                   disabled={isAnswering || searchableEvidenceCount === 0}
                 >
-                  {isAnswering ? "Generating answerâ€¦" : "Generate answer"}
+                  {isAnswering ? "Generating answer..." : "Generate answer"}
                 </button>
               </div>
             </form>
@@ -1900,7 +1899,7 @@ export default function WorkspaceDetailPage() {
                     </span>
                     <span className={styles.traceQuery}>{trace.query}</span>
                     <span className={styles.traceTiming}>
-                      {trace.total_ms !== null ? `${trace.total_ms} ms` : "â€”"}
+                      {trace.total_ms !== null ? `${trace.total_ms} ms` : "-"}
                     </span>
                     <time dateTime={trace.created_at}>
                       {formatDate(trace.created_at)}
@@ -1911,7 +1910,7 @@ export default function WorkspaceDetailPage() {
             )}
 
             {isLoadingTrace && (
-              <p className={styles.traceLoading}>Loading traceâ€¦</p>
+              <p className={styles.traceLoading}>Loading trace...</p>
             )}
 
             {selectedTrace && !isLoadingTrace && (
@@ -1932,19 +1931,19 @@ export default function WorkspaceDetailPage() {
                 <div className={styles.traceMetrics}>
                   <div>
                     <span>Retrieval</span>
-                    <strong>{selectedTrace.retrieval_ms ?? "â€”"} ms</strong>
+                    <strong>{selectedTrace.retrieval_ms ?? "-"} ms</strong>
                   </div>
                   <div>
                     <span>Generation</span>
-                    <strong>{selectedTrace.generation_ms ?? "â€”"} ms</strong>
+                    <strong>{selectedTrace.generation_ms ?? "-"} ms</strong>
                   </div>
                   <div>
                     <span>Total</span>
-                    <strong>{selectedTrace.total_ms ?? "â€”"} ms</strong>
+                    <strong>{selectedTrace.total_ms ?? "-"} ms</strong>
                   </div>
                   <div>
                     <span>Tokens</span>
-                    <strong>{selectedTrace.total_tokens ?? "â€”"}</strong>
+                    <strong>{selectedTrace.total_tokens ?? "-"}</strong>
                   </div>
                 </div>
 
@@ -2068,7 +2067,7 @@ export default function WorkspaceDetailPage() {
                     )}
                     <p>
                       {sourceText.slice(0, 150)}
-                      {source.raw_text.length > 150 ? "â€¦" : ""}
+                      {source.raw_text.length > 150 ? "..." : ""}
                     </p>
                     <div className={styles.sourceActions}>
                       <button
@@ -2326,7 +2325,7 @@ export default function WorkspaceDetailPage() {
                 <h2 id="detail-title">
                   {detailView.kind === "source"
                     ? detailView.item.title
-                    : `${sourceTitleForChunk(detailView.item)} Â· Chunk ${
+                    : `${sourceTitleForChunk(detailView.item)} - Chunk ${
                         detailView.item.chunk_index + 1
                       }`}
                 </h2>
@@ -2367,7 +2366,7 @@ export default function WorkspaceDetailPage() {
                 aria-label="Close full content view"
                 onClick={() => setDetailView(null)}
               >
-                Ã—
+                &times;
               </button>
             </header>
 
