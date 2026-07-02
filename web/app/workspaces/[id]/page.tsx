@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -1986,7 +1986,7 @@ export default function WorkspaceDetailPage() {
 
             {sources.length === 0 ? (
               <div className={styles.emptyState}>
-                <span aria-hidden="true">ï¼‹</span>
+                <span aria-hidden="true">+</span>
                 <p>No uploaded sources yet</p>
                 <small>
                   Upload or import content to make it searchable in this
