@@ -435,7 +435,7 @@ export default function HomePage() {
 
             <div className={styles.heroVisual} aria-hidden="true">
               <img
-                src="https://images.phawats.com/homepage_workflow_interface_design_3.png"
+                src="https://images.phawats.com/Streamlined%20workspace%20for%20efficient%20research%20insights.png"
                 alt=""
               />
             </div>
