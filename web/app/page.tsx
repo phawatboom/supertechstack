@@ -400,17 +400,30 @@ export default function HomePage() {
         </Link>
 
         <div className={styles.headerActions}>
-          <Link href="/demo" className={styles.demoLink}>
-            View demo
-          </Link>
           {session ? (
-            <button type="button" onClick={() => void signOut()}>
-              Sign out
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMessage("");
+                  setIsCreateWorkspaceOpen(true);
+                }}
+              >
+                Create
+              </button>
+              <button type="button" onClick={() => void signOut()}>
+                Sign out
+              </button>
+            </>
           ) : (
-            <Link href="/auth" className={styles.signInLink}>
-              Sign in
-            </Link>
+            <>
+              <Link href="/demo" className={styles.demoLink}>
+                View demo
+              </Link>
+              <Link href="/auth" className={styles.signInLink}>
+                Sign in
+              </Link>
+            </>
           )}
         </div>
       </header>
